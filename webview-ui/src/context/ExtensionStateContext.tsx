@@ -203,6 +203,8 @@ const createInitialExtensionState = (): ExtensionState => ({
 	shouldShowAnnouncement: false,
 	allowedCommands: [],
 	deniedCommands: [],
+	allowedReadFiles: [],
+	allowedWriteFiles: [],
 	soundEnabled: false,
 	soundVolume: 0.5,
 	ttsEnabled: false,
