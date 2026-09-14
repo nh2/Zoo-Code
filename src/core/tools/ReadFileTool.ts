@@ -1,9 +1,15 @@
 /**
  * ReadFileTool - Codex-inspired file reading with indentation mode support.
  *
- * Supports two modes:
+ * Supports three modes:
  * 1. Slice mode (default): Read contiguous lines with offset/limit
  * 2. Indentation mode: Extract semantic code blocks based on indentation hierarchy
+ * 3. bytes_as_utf8 mode: Read a byte window, decoded as UTF-8
+ *
+ * The byte mode exists because the line-based modes can only ever select whole
+ * lines, so content past the per-line display cap on a very long line has no
+ * line-based address at all. Truncation markers report the byte offsets that
+ * were omitted, and those offsets are passed back here to retrieve them.
  *
  * Also supports legacy format for backward compatibility:
  * - Legacy format: { files: [{ path: string, lineRanges?: [...] }] }
@@ -21,8 +27,9 @@ import { RecordSource } from "../context-tracking/FileContextTrackerTypes"
 import { isPathOutsideWorkspace } from "../../utils/pathUtils"
 import { getReadablePath } from "../../utils/path"
 import { extractTextFromFile, addLineNumbers, getSupportedBinaryFormats } from "../../integrations/misc/extract-text"
-import { readWithIndentation, readWithSlice } from "../../integrations/misc/indentation-reader"
-import { DEFAULT_LINE_LIMIT } from "../prompts/tools/native-tools/read_file"
+import { readWithIndentation, readWithSlice, formatTruncationSummary } from "../../integrations/misc/indentation-reader"
+import { readByteWindow, formatByteReadResult } from "../../integrations/misc/byte-reader"
+import { DEFAULT_LINE_LIMIT, DEFAULT_BYTE_LIMIT } from "../prompts/tools/native-tools/read_file"
 import type { ToolUse, PushToolResult } from "../../shared/tools"
 
 import {
@@ -50,6 +57,10 @@ interface InternalFileEntry {
 	include_siblings?: boolean
 	include_header?: boolean
 	max_lines?: number
+	/** 0-based byte offset for `bytes_as_utf8` mode. Distinct from `offset`, which is a line number. */
+	byte_offset?: number
+	/** Byte count for `bytes_as_utf8` mode. Distinct from `limit`, which is a line count. */
+	byte_limit?: number
 }
 
 interface FileResult {
@@ -111,6 +122,19 @@ export class ReadFileTool extends BaseTool<"read_file"> {
 			pushToolResult(`Error: ${errorMsg}`)
 			return
 		}
+		// Byte offsets are 0-based, unlike the 1-based line offsets above. A
+		// negative value is the one case that cannot be interpreted, so reject it
+		// rather than silently clamping and returning the head of the file.
+		if (params.bytes_as_utf8?.offset !== undefined && params.bytes_as_utf8.offset < 0) {
+			const errorMsg = `bytes_as_utf8.offset must be a 0-indexed byte offset (got ${params.bytes_as_utf8.offset}).`
+			pushToolResult(`Error: ${errorMsg}`)
+			return
+		}
+		if (params.bytes_as_utf8?.limit !== undefined && params.bytes_as_utf8.limit < 1) {
+			const errorMsg = `bytes_as_utf8.limit must be at least 1 byte (got ${params.bytes_as_utf8.limit}).`
+			pushToolResult(`Error: ${errorMsg}`)
+			return
+		}
 
 		const fileEntry: InternalFileEntry = {
 			path: filePath,
@@ -122,6 +146,8 @@ export class ReadFileTool extends BaseTool<"read_file"> {
 			include_siblings: params.indentation?.include_siblings,
 			include_header: params.indentation?.include_header,
 			max_lines: params.indentation?.max_lines,
+			byte_offset: params.bytes_as_utf8?.offset,
+			byte_limit: params.bytes_as_utf8?.limit,
 		}
 
 		const fileResults: FileResult[] = [
@@ -194,6 +220,26 @@ export class ReadFileTool extends BaseTool<"read_file"> {
 						continue
 					}
 
+					// Byte mode reads positionally, before the binary check and before
+					// any whole-file load. Both of those would defeat its purpose: a
+					// caller reaches for a byte window precisely when the file is too
+					// large to hold or too unstructured for the line reader, and an
+					// explicit byte offset is an unambiguous request for those bytes
+					// whatever the file's detected type.
+					if (entry.mode === "bytes_as_utf8") {
+						const byteResult = await readByteWindow(fullPath, {
+							offset: entry.byte_offset,
+							limit: entry.byte_limit ?? DEFAULT_BYTE_LIMIT,
+						})
+
+						await task.fileContextTracker.trackFileContext(relPath, "read_tool" as RecordSource)
+
+						updateFileResult(relPath, {
+							nativeContent: `File: ${relPath}\n${formatByteReadResult(byteResult)}`,
+						})
+						continue
+					}
+
 					// Check for binary file
 					const isBinary = await isBinaryFile(fullPath)
 
@@ -214,9 +260,11 @@ export class ReadFileTool extends BaseTool<"read_file"> {
 					// Read text file content with lossy UTF-8 conversion
 					// Reading as Buffer first allows graceful handling of non-UTF8 bytes
 					// (they become U+FFFD replacement characters instead of throwing)
+					// The Buffer is passed on rather than a decoded string: byte offsets
+					// in truncation markers are only true file offsets when measured
+					// from the original bytes.
 					const buffer = await fs.readFile(fullPath)
-					const fileContent = buffer.toString("utf-8")
-					const result = this.processTextFile(fileContent, entry)
+					const result = this.processTextFile(buffer, entry)
 
 					await task.fileContextTracker.trackFileContext(relPath, "read_tool" as RecordSource)
 
@@ -265,8 +313,13 @@ export class ReadFileTool extends BaseTool<"read_file"> {
 
 	/**
 	 * Process a text file according to the requested mode.
+	 *
+	 * Takes the raw Buffer rather than a decoded string so that byte offsets
+	 * reported in truncation markers are true file offsets. Decoding first would
+	 * map each invalid byte to U+FFFD, which re-encodes to three bytes where the
+	 * original was one, drifting every offset after it.
 	 */
-	private processTextFile(content: string, entry: InternalFileEntry): string {
+	private processTextFile(content: Buffer, entry: InternalFileEntry): string {
 		const mode = entry.mode || "slice"
 
 		if (mode === "indentation") {
@@ -292,12 +345,16 @@ export class ReadFileTool extends BaseTool<"read_file"> {
 				output = `IMPORTANT: File content truncated.
 	Status: Showing lines ${start}-${end} of ${result.totalLines} total lines.
 	To read more: Use the read_file tool with offset=${nextOffset} and limit=${effectiveLimit}.
-	
+
 	${result.content}`
 			} else if (result.includedRanges.length > 0) {
 				const rangeStr = result.includedRanges.map(([s, e]) => `${s}-${e}`).join(", ")
 				output += `\n\nIncluded ranges: ${rangeStr} (total: ${result.totalLines} lines)`
 			}
+
+			// Line truncation is orthogonal to the line-count limit above: a read can
+			// fit entirely within the limit and still hide content on a long line.
+			output += formatTruncationSummary(result.truncatedLines)
 
 			return output
 		}
@@ -320,11 +377,15 @@ export class ReadFileTool extends BaseTool<"read_file"> {
 			output = `IMPORTANT: File content truncated.
 	Status: Showing lines ${startLine}-${endLine} of ${result.totalLines} total lines.
 	To read more: Use the read_file tool with offset=${nextOffset} and limit=${limit}.
-	
+
 	${result.content}`
 		} else if (result.returnedLines === 0) {
 			output = "Note: File is empty"
 		}
+
+		// Line truncation is orthogonal to the line-count limit above: a read can
+		// fit entirely within the limit and still hide content on a long line.
+		output += formatTruncationSummary(result.truncatedLines)
 
 		return output
 	}
@@ -541,6 +602,12 @@ export class ReadFileTool extends BaseTool<"read_file"> {
 			// For indentation mode, always return the effective anchor line
 			return entry.anchor_line ?? entry.offset ?? 1
 		}
+		if (entry.mode === "bytes_as_utf8") {
+			// A byte offset is not a line number, and the line it falls on is not
+			// known until the file is read. Reporting nothing is better than
+			// reporting a byte offset in a field the UI treats as a line.
+			return undefined
+		}
 		const offset = entry.offset ?? 1
 		return offset > 1 ? offset : undefined
 	}
@@ -553,6 +620,19 @@ export class ReadFileTool extends BaseTool<"read_file"> {
 			// Always show indentation mode with the effective anchor line
 			const effectiveAnchor = entry.anchor_line ?? entry.offset ?? 1
 			return `(indentation mode at line ${effectiveAnchor})`
+		}
+
+		if (entry.mode === "bytes_as_utf8") {
+			const byteOffset = entry.byte_offset ?? 0
+			// Name the unit explicitly: an unqualified number here would read as a
+			// line number, which is what every other mode puts in this position.
+			if (entry.byte_limit === undefined) {
+				// The end of the window is not known before the read, since the file
+				// may be shorter than the default budget. Naming a computed end here
+				// would assert a range that may not exist.
+				return `(from byte offset ${byteOffset}, up to ${DEFAULT_BYTE_LIMIT} bytes)`
+			}
+			return `(bytes ${byteOffset}-${byteOffset + entry.byte_limit - 1})`
 		}
 
 		const limit = entry.limit ?? DEFAULT_LINE_LIMIT

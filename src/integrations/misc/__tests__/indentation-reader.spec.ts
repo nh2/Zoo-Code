@@ -19,20 +19,20 @@ from typing import List
 
 class Calculator:
     """A simple calculator class."""
-    
+
     def __init__(self, value: int = 0):
         self.value = value
-    
+
     def add(self, n: int) -> int:
         """Add a number."""
         self.value += n
         return self.value
-    
+
     def subtract(self, n: int) -> int:
         """Subtract a number."""
         self.value -= n
         return self.value
-    
+
     def reset(self):
         """Reset to zero."""
         self.value = 0
@@ -97,11 +97,11 @@ const SIMPLE_CODE = `function outer() {
 const CODE_WITH_BLANKS = `class Example:
     def method_one(self):
         x = 1
-        
+
         y = 2
-        
+
         return x + y
-    
+
     def method_two(self):
         return 42
 `
@@ -213,42 +213,124 @@ describe("computeEffectiveIndents", () => {
 
 // ─── formatWithLineNumbers Tests ──────────────────────────────────────────────
 
+/**
+ * Build a LineRecord for formatter tests.
+ *
+ * `byteOffset` defaults to 0, so tests that care about reported offsets must set
+ * it explicitly; a marker naming offset 0 for a line that is not at the start of
+ * the file would be wrong in a way the formatter cannot detect.
+ */
+function lineRecord(lineNumber: number, content: string, byteOffset = 0): LineRecord {
+	const raw = Buffer.from(content, "utf8")
+	return {
+		lineNumber,
+		content,
+		indentLevel: 0,
+		isBlank: content.trim().length === 0,
+		isBlockStart: false,
+		byteOffset,
+		byteLength: raw.length,
+		raw,
+	}
+}
+
 describe("formatWithLineNumbers", () => {
 	it("should format lines with line numbers", () => {
-		const lines: LineRecord[] = [
-			{ lineNumber: 1, content: "first", indentLevel: 0, isBlank: false, isBlockStart: false },
-			{ lineNumber: 2, content: "second", indentLevel: 0, isBlank: false, isBlockStart: false },
-		]
+		const lines = [lineRecord(1, "first"), lineRecord(2, "second", 6)]
 
 		const result = formatWithLineNumbers(lines)
-		expect(result).toBe("1 | first\n2 | second")
+		expect(result.content).toBe("1 | first\n2 | second")
+		expect(result.truncatedLines).toEqual([])
 	})
 
 	it("should pad line numbers for alignment", () => {
-		const lines: LineRecord[] = [
-			{ lineNumber: 1, content: "a", indentLevel: 0, isBlank: false, isBlockStart: false },
-			{ lineNumber: 10, content: "b", indentLevel: 0, isBlank: false, isBlockStart: false },
-			{ lineNumber: 100, content: "c", indentLevel: 0, isBlank: false, isBlockStart: false },
-		]
+		const lines = [lineRecord(1, "a"), lineRecord(10, "b"), lineRecord(100, "c")]
 
 		const result = formatWithLineNumbers(lines)
-		expect(result).toBe("  1 | a\n 10 | b\n100 | c")
+		expect(result.content).toBe("  1 | a\n 10 | b\n100 | c")
 	})
 
-	it("should truncate long lines", () => {
+	it("should truncate long lines at exactly the byte cap", () => {
 		const longLine = "x".repeat(600)
-		const lines: LineRecord[] = [
-			{ lineNumber: 1, content: longLine, indentLevel: 0, isBlank: false, isBlockStart: false },
-		]
+		const lines = [lineRecord(1, longLine)]
 
 		const result = formatWithLineNumbers(lines, 100)
-		expect(result.length).toBeLessThan(longLine.length)
-		expect(result).toContain("...")
+
+		// The full budget goes to content; the marker sits outside it. Pinning the
+		// exact kept prefix is the point: an assertion that merely checks the output
+		// got shorter passes for any cut point, including an off-by-three one.
+		expect(result.content).toBe(
+			`1 | ${"x".repeat(100)}[+500 bytes omitted, ` +
+				`starting at byte offset 100 up to and including byte offset 599]`,
+		)
+	})
+
+	it("should report the omitted range relative to the file, not the line", () => {
+		// A line starting at byte 1000: the marker must name absolute file offsets,
+		// since that is what gets passed back as bytes_as_utf8.offset.
+		const lines = [lineRecord(7, "y".repeat(300), 1000)]
+
+		const result = formatWithLineNumbers(lines, 100)
+
+		expect(result.truncatedLines).toEqual([
+			{
+				lineNumber: 7,
+				lineByteLength: 300,
+				omittedBytes: 200,
+				omittedStartOffset: 1100,
+				omittedEndOffset: 1299,
+			},
+		])
+	})
+
+	it("should keep the omitted range self-consistent", () => {
+		const lines = [lineRecord(1, "z".repeat(1234))]
+
+		const { truncatedLines } = formatWithLineNumbers(lines, 100)
+		const [truncation] = truncatedLines
+
+		// end - start + 1 == omitted, because both endpoints are inclusive.
+		expect(truncation.omittedEndOffset - truncation.omittedStartOffset + 1).toBe(truncation.omittedBytes)
+	})
+
+	it("should not split a multi-byte character at the cut point", () => {
+		// "é" is 2 bytes: a cap of 11 lands inside the 6th one.
+		const line = "é".repeat(10)
+		const lines = [lineRecord(1, line)]
+
+		const result = formatWithLineNumbers(lines, 11)
+
+		// 10 bytes kept (5 whole characters), not 11 with a mangled tail.
+		expect(result.content).toContain(`1 | ${"é".repeat(5)}[`)
+		expect(result.content).not.toContain("\uFFFD")
+		expect(result.truncatedLines[0].omittedStartOffset).toBe(10)
+		expect(result.truncatedLines[0].omittedBytes).toBe(10)
+	})
+
+	it("should measure the cap in bytes, not characters", () => {
+		// 60 characters, 120 bytes: a 100-byte cap must truncate it even though
+		// the character count is below 100.
+		const lines = [lineRecord(1, "é".repeat(60))]
+
+		const result = formatWithLineNumbers(lines, 100)
+
+		expect(result.truncatedLines).toHaveLength(1)
+		expect(result.truncatedLines[0].lineByteLength).toBe(120)
+	})
+
+	it("should not truncate a line exactly at the cap", () => {
+		const lines = [lineRecord(1, "x".repeat(100))]
+
+		const result = formatWithLineNumbers(lines, 100)
+
+		expect(result.content).toBe(`1 | ${"x".repeat(100)}`)
+		expect(result.truncatedLines).toEqual([])
 	})
 
 	it("should handle empty array", () => {
 		const result = formatWithLineNumbers([])
-		expect(result).toBe("")
+		expect(result.content).toBe("")
+		expect(result.truncatedLines).toEqual([])
 	})
 })
 

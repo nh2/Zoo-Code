@@ -29,6 +29,7 @@ import {
 } from "../helpers/imageHelpers"
 import { extractTextFromFile, addLineNumbers, getSupportedBinaryFormats } from "../../../integrations/misc/extract-text"
 import { readWithIndentation, readWithSlice } from "../../../integrations/misc/indentation-reader"
+import { readByteWindow } from "../../../integrations/misc/byte-reader"
 
 // ─── Mocks ────────────────────────────────────────────────────────────────────
 
@@ -63,6 +64,12 @@ vi.mock("../../../integrations/misc/extract-text", () => ({
 vi.mock("../../../integrations/misc/indentation-reader", () => ({
 	readWithIndentation: vi.fn(),
 	readWithSlice: vi.fn(),
+	formatTruncationSummary: vi.fn(() => ""),
+}))
+
+vi.mock("../../../integrations/misc/byte-reader", () => ({
+	readByteWindow: vi.fn(),
+	formatByteReadResult: vi.fn(() => "formatted byte window"),
 }))
 
 vi.mock("../helpers/imageHelpers", () => ({
@@ -127,6 +134,7 @@ const mockedFsStat = vi.mocked(fsPromises.stat)
 const mockedIsBinaryFile = vi.mocked(isBinaryFile)
 const mockedExtractTextFromFile = vi.mocked(extractTextFromFile)
 const mockedReadWithSlice = vi.mocked(readWithSlice)
+const mockedReadByteWindow = vi.mocked(readByteWindow)
 const mockedReadWithIndentation = vi.mocked(readWithIndentation)
 const mockedIsSupportedImageFormat = vi.mocked(isSupportedImageFormat)
 const mockedValidateImageForProcessing = vi.mocked(validateImageForProcessing)
@@ -139,6 +147,18 @@ interface MockTaskOptions {
 	rooIgnoreAllowed?: boolean
 	maxImageFileSize?: number
 	maxTotalImageSize?: number
+}
+
+/**
+ * Narrow a mock task to the `Task` shape `execute()` expects.
+ *
+ * The mock deliberately implements only the members the tool touches, so some
+ * conversion is unavoidable. Going through `unknown` rather than `any` keeps the
+ * result fully typed at the call site: an `as any` would silently accept a
+ * wrong second argument too.
+ */
+function asTask(mockTask: ReturnType<typeof createMockTask>): Task {
+	return mockTask as unknown as Task
 }
 
 function createMockTask(options: MockTaskOptions = {}) {
@@ -198,6 +218,7 @@ describe("ReadFileTool", () => {
 			returnedLines: 1,
 			totalLines: 1,
 			wasTruncated: false,
+			truncatedLines: [],
 			includedRanges: [[1, 1]],
 		})
 	})
@@ -487,6 +508,7 @@ describe("ReadFileTool", () => {
 				returnedLines: 3,
 				totalLines: 3,
 				wasTruncated: false,
+				truncatedLines: [],
 				includedRanges: [[1, 3]],
 			})
 
@@ -506,6 +528,7 @@ describe("ReadFileTool", () => {
 				returnedLines: 2,
 				totalLines: 5,
 				wasTruncated: true,
+				truncatedLines: [],
 				includedRanges: [[2, 3]],
 			})
 
@@ -515,7 +538,7 @@ describe("ReadFileTool", () => {
 				callbacks,
 			)
 
-			expect(mockedReadWithSlice).toHaveBeenCalledWith(expect.any(String), 1, 2) // offset converted to 0-based
+			expect(mockedReadWithSlice).toHaveBeenCalledWith(expect.any(Buffer), 1, 2) // offset converted to 0-based
 		})
 
 		it("should read text file with indentation mode", async () => {
@@ -529,6 +552,7 @@ describe("ReadFileTool", () => {
 				returnedLines: 5,
 				totalLines: 5,
 				wasTruncated: false,
+				truncatedLines: [],
 				includedRanges: [[1, 5]],
 			})
 
@@ -542,8 +566,10 @@ describe("ReadFileTool", () => {
 				callbacks,
 			)
 
+			// The reader takes the raw Buffer, so compare bytes rather than the
+			// string: only the original bytes yield true file offsets.
 			expect(mockedReadWithIndentation).toHaveBeenCalledWith(
-				content,
+				Buffer.from(content, "utf8"),
 				expect.objectContaining({
 					anchorLine: 3,
 				}),
@@ -560,6 +586,7 @@ describe("ReadFileTool", () => {
 				returnedLines: 100,
 				totalLines: 5000,
 				wasTruncated: true,
+				truncatedLines: [],
 				includedRanges: [[1, 100]],
 			})
 
@@ -579,6 +606,7 @@ describe("ReadFileTool", () => {
 				returnedLines: 0,
 				totalLines: 0,
 				wasTruncated: false,
+				truncatedLines: [],
 				includedRanges: [],
 			})
 
@@ -628,6 +656,7 @@ describe("ReadFileTool", () => {
 				returnedLines: 1,
 				totalLines: 1,
 				wasTruncated: false,
+				truncatedLines: [],
 				includedRanges: [[1, 1]],
 			})
 
@@ -665,6 +694,7 @@ describe("ReadFileTool", () => {
 				returnedLines: 1,
 				totalLines: 1,
 				wasTruncated: false,
+				truncatedLines: [],
 				includedRanges: [[1, 1]],
 			})
 
@@ -683,6 +713,7 @@ describe("ReadFileTool", () => {
 				returnedLines: 1,
 				totalLines: 1,
 				wasTruncated: false,
+				truncatedLines: [],
 				includedRanges: [[1, 1]],
 			})
 
@@ -778,6 +809,7 @@ describe("ReadFileTool", () => {
 					returnedLines: 1,
 					totalLines: 1,
 					wasTruncated: false,
+					truncatedLines: [],
 					includedRanges: [[1, 1]],
 				})
 				.mockReturnValueOnce({
@@ -785,6 +817,7 @@ describe("ReadFileTool", () => {
 					returnedLines: 1,
 					totalLines: 1,
 					wasTruncated: false,
+					truncatedLines: [],
 					includedRanges: [[1, 1]],
 				})
 
@@ -968,6 +1001,7 @@ describe("ReadFileTool", () => {
 				returnedLines: 100,
 				totalLines: 5000,
 				wasTruncated: true,
+				truncatedLines: [],
 				includedRanges: [[1, 100]],
 			})
 
@@ -1140,6 +1174,7 @@ describe("ReadFileTool", () => {
 				returnedLines: 1,
 				totalLines: 10,
 				wasTruncated: false,
+				truncatedLines: [],
 				includedRanges: [[5, 5]],
 			})
 
@@ -1154,7 +1189,7 @@ describe("ReadFileTool", () => {
 			)
 
 			expect(mockedReadWithIndentation).toHaveBeenCalledWith(
-				expect.any(String),
+				expect.any(Buffer),
 				expect.objectContaining({ anchorLine: 5 }),
 			)
 		})
@@ -1169,6 +1204,7 @@ describe("ReadFileTool", () => {
 				returnedLines: 1,
 				totalLines: 10,
 				wasTruncated: false,
+				truncatedLines: [],
 				includedRanges: [[1, 1]],
 			})
 
@@ -1182,7 +1218,7 @@ describe("ReadFileTool", () => {
 			)
 
 			expect(mockedReadWithIndentation).toHaveBeenCalledWith(
-				expect.any(String),
+				expect.any(Buffer),
 				expect.objectContaining({ anchorLine: 1 }),
 			)
 		})
@@ -1197,6 +1233,7 @@ describe("ReadFileTool", () => {
 				returnedLines: 50,
 				totalLines: 200,
 				wasTruncated: true,
+				truncatedLines: [],
 				includedRanges: [[1, 50]],
 			})
 
@@ -1224,6 +1261,7 @@ describe("ReadFileTool", () => {
 				returnedLines: 10,
 				totalLines: 100,
 				wasTruncated: false,
+				truncatedLines: [],
 				includedRanges: [[5, 14]],
 			})
 
@@ -1250,6 +1288,7 @@ describe("ReadFileTool", () => {
 				returnedLines: 1,
 				totalLines: 1,
 				wasTruncated: false,
+				truncatedLines: [],
 				includedRanges: [[1, 1]],
 			})
 
@@ -1271,7 +1310,7 @@ describe("ReadFileTool", () => {
 			)
 
 			expect(mockedReadWithIndentation).toHaveBeenCalledWith(
-				expect.any(String),
+				expect.any(Buffer),
 				expect.objectContaining({
 					anchorLine: 10,
 					maxLevels: 2,
@@ -1299,6 +1338,7 @@ describe("ReadFileTool", () => {
 				returnedLines: 1,
 				totalLines: 10,
 				wasTruncated: false,
+				truncatedLines: [],
 				includedRanges: [[4, 4]],
 			})
 
@@ -1309,7 +1349,7 @@ describe("ReadFileTool", () => {
 			)
 
 			// offset=4 (1-based) should become 3 (0-based) passed to readWithSlice
-			expect(mockedReadWithSlice).toHaveBeenCalledWith(expect.any(String), 3, 1)
+			expect(mockedReadWithSlice).toHaveBeenCalledWith(expect.any(Buffer), 3, 1)
 		})
 
 		it("should use default offset of 1 when not specified", async () => {
@@ -1322,13 +1362,14 @@ describe("ReadFileTool", () => {
 				returnedLines: 1,
 				totalLines: 1,
 				wasTruncated: false,
+				truncatedLines: [],
 				includedRanges: [[1, 1]],
 			})
 
 			await readFileTool.execute({ path: "test.ts" }, mockTask as any, callbacks)
 
 			// Default offset=1 -> 0-based = 0
-			expect(mockedReadWithSlice).toHaveBeenCalledWith(expect.any(String), 0, expect.any(Number))
+			expect(mockedReadWithSlice).toHaveBeenCalledWith(expect.any(Buffer), 0, expect.any(Number))
 		})
 
 		it("should use default limit when not specified", async () => {
@@ -1341,13 +1382,14 @@ describe("ReadFileTool", () => {
 				returnedLines: 1,
 				totalLines: 1,
 				wasTruncated: false,
+				truncatedLines: [],
 				includedRanges: [[1, 1]],
 			})
 
 			await readFileTool.execute({ path: "test.ts" }, mockTask as any, callbacks)
 
 			// Should use DEFAULT_LINE_LIMIT (which is typically 2000)
-			expect(mockedReadWithSlice).toHaveBeenCalledWith(expect.any(String), expect.any(Number), expect.any(Number))
+			expect(mockedReadWithSlice).toHaveBeenCalledWith(expect.any(Buffer), expect.any(Number), expect.any(Number))
 		})
 
 		it("should show correct line range in truncation notice", async () => {
@@ -1360,6 +1402,7 @@ describe("ReadFileTool", () => {
 				returnedLines: 100,
 				totalLines: 500,
 				wasTruncated: true,
+				truncatedLines: [],
 				includedRanges: [[5, 104]],
 			})
 
@@ -1384,6 +1427,7 @@ describe("ReadFileTool", () => {
 				returnedLines: 1,
 				totalLines: 1,
 				wasTruncated: false,
+				truncatedLines: [],
 				includedRanges: [[1, 1]],
 			})
 
@@ -1413,6 +1457,7 @@ describe("ReadFileTool", () => {
 				returnedLines: 1,
 				totalLines: 1,
 				wasTruncated: false,
+				truncatedLines: [],
 				includedRanges: [[1, 1]],
 			})
 
@@ -1434,6 +1479,7 @@ describe("ReadFileTool", () => {
 				returnedLines: 1,
 				totalLines: 1,
 				wasTruncated: false,
+				truncatedLines: [],
 				includedRanges: [[1, 1]],
 			})
 
@@ -1456,6 +1502,7 @@ describe("ReadFileTool", () => {
 				returnedLines: 1,
 				totalLines: 1,
 				wasTruncated: false,
+				truncatedLines: [],
 				includedRanges: [[1, 1]],
 			})
 
@@ -1490,6 +1537,7 @@ describe("ReadFileTool", () => {
 				returnedLines: 1,
 				totalLines: 1,
 				wasTruncated: false,
+				truncatedLines: [],
 				includedRanges: [[1, 1]],
 			})
 
@@ -1514,12 +1562,167 @@ describe("ReadFileTool", () => {
 				returnedLines: 1,
 				totalLines: 1,
 				wasTruncated: false,
+				truncatedLines: [],
 				includedRanges: [[1, 1]],
 			})
 
 			await readFileTool.execute({ path: "test.ts" }, mockTask as any, callbacks)
 
 			expect(callbacks.pushToolResult).toHaveBeenCalled()
+		})
+	})
+
+	describe("bytes_as_utf8 mode", () => {
+		beforeEach(() => {
+			mockedReadByteWindow.mockResolvedValue({
+				content: "windowed content",
+				totalBytes: 10000,
+				startOffset: 5000,
+				endOffset: 9096,
+				partialBytesTrimmedAtStart: 0,
+				partialBytesTrimmedAtEnd: 0,
+				replacementCharCount: 0,
+				hasMoreAfter: true,
+				startLineNumber: 2,
+			})
+		})
+
+		it("should pass the byte window through to the reader", async () => {
+			const mockTask = createMockTask()
+			const callbacks = createMockCallbacks()
+
+			await readFileTool.execute(
+				{ path: "data.json", mode: "bytes_as_utf8", bytes_as_utf8: { offset: 5000, limit: 4096 } },
+				asTask(mockTask),
+				callbacks,
+			)
+
+			expect(mockedReadByteWindow).toHaveBeenCalledWith(expect.stringContaining("data.json"), {
+				offset: 5000,
+				limit: 4096,
+			})
+			expect(callbacks.pushToolResult).toHaveBeenCalledWith(expect.stringContaining("formatted byte window"))
+		})
+
+		it("should not load the whole file", async () => {
+			const mockTask = createMockTask()
+			const callbacks = createMockCallbacks()
+
+			await readFileTool.execute(
+				{ path: "huge.log", mode: "bytes_as_utf8", bytes_as_utf8: { offset: 0, limit: 100 } },
+				asTask(mockTask),
+				callbacks,
+			)
+
+			// The point of byte mode is reaching content in files too large to hold.
+			// A whole-file read here would defeat it and could fail to allocate.
+			expect(mockedFsReadFile).not.toHaveBeenCalled()
+		})
+
+		it("should read binary files rather than refusing them", async () => {
+			const mockTask = createMockTask()
+			const callbacks = createMockCallbacks()
+			mockedIsBinaryFile.mockResolvedValue(true)
+
+			await readFileTool.execute(
+				{ path: "data.bin", mode: "bytes_as_utf8", bytes_as_utf8: { offset: 10 } },
+				asTask(mockTask),
+				callbacks,
+			)
+
+			// An explicit byte offset is an unambiguous request for those bytes,
+			// whatever the file's detected type.
+			expect(mockedReadByteWindow).toHaveBeenCalled()
+			expect(callbacks.pushToolResult).toHaveBeenCalledWith(expect.stringContaining("formatted byte window"))
+		})
+
+		it("should default the offset to 0 when unspecified", async () => {
+			const mockTask = createMockTask()
+			const callbacks = createMockCallbacks()
+
+			await readFileTool.execute({ path: "data.json", mode: "bytes_as_utf8" }, asTask(mockTask), callbacks)
+
+			expect(mockedReadByteWindow).toHaveBeenCalledWith(
+				expect.any(String),
+				expect.objectContaining({ offset: undefined }),
+			)
+		})
+
+		it("should reject a negative byte offset", async () => {
+			const mockTask = createMockTask()
+			const callbacks = createMockCallbacks()
+
+			await readFileTool.execute(
+				{ path: "data.json", mode: "bytes_as_utf8", bytes_as_utf8: { offset: -1 } },
+				asTask(mockTask),
+				callbacks,
+			)
+
+			// Clamping to 0 would silently return the head of the file, which is not
+			// what was asked for.
+			expect(callbacks.pushToolResult).toHaveBeenCalledWith(expect.stringContaining("0-indexed byte offset"))
+			expect(mockedReadByteWindow).not.toHaveBeenCalled()
+		})
+
+		it("should reject a zero byte limit", async () => {
+			const mockTask = createMockTask()
+			const callbacks = createMockCallbacks()
+
+			await readFileTool.execute(
+				{ path: "data.json", mode: "bytes_as_utf8", bytes_as_utf8: { limit: 0 } },
+				asTask(mockTask),
+				callbacks,
+			)
+
+			expect(callbacks.pushToolResult).toHaveBeenCalledWith(expect.stringContaining("at least 1 byte"))
+			expect(mockedReadByteWindow).not.toHaveBeenCalled()
+		})
+
+		it("should track the file in context", async () => {
+			const mockTask = createMockTask()
+			const callbacks = createMockCallbacks()
+
+			await readFileTool.execute(
+				{ path: "data.json", mode: "bytes_as_utf8", bytes_as_utf8: { offset: 100 } },
+				asTask(mockTask),
+				callbacks,
+			)
+
+			expect(mockTask.fileContextTracker.trackFileContext).toHaveBeenCalledWith("data.json", "read_tool")
+		})
+
+		it("should name bytes, not lines, in the approval message", async () => {
+			const mockTask = createMockTask()
+			const callbacks = createMockCallbacks()
+
+			await readFileTool.execute(
+				{ path: "data.json", mode: "bytes_as_utf8", bytes_as_utf8: { offset: 5000, limit: 100 } },
+				asTask(mockTask),
+				callbacks,
+			)
+
+			const message = JSON.parse(mockTask.ask.mock.calls[0][1])
+			// An unqualified number here would read as a line number, which is what
+			// every other mode puts in this field.
+			expect(message.reason).toBe("(bytes 5000-5099)")
+			// A byte offset must not leak into a field the UI treats as a line.
+			expect(message.startLine).toBeUndefined()
+		})
+
+		it("should not assert an end offset when the limit is defaulted", async () => {
+			const mockTask = createMockTask()
+			const callbacks = createMockCallbacks()
+
+			await readFileTool.execute(
+				{ path: "data.json", mode: "bytes_as_utf8", bytes_as_utf8: { offset: 10 } },
+				asTask(mockTask),
+				callbacks,
+			)
+
+			const message = JSON.parse(mockTask.ask.mock.calls[0][1])
+			// The file may be shorter than the default budget, so naming a computed
+			// end would show the user a range that does not exist.
+			expect(message.reason).toBe("(from byte offset 10, up to 40960 bytes)")
 		})
 	})
 
