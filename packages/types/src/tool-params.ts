@@ -6,8 +6,15 @@
  * Read mode for the read_file tool.
  * - "slice": Simple offset/limit reading (default)
  * - "indentation": Semantic block extraction based on code structure
+ * - "bytes_as_utf8": Raw byte window, decoded as UTF-8
+ *
+ * The mode name spells out the decode because the output of a byte window is
+ * not byte-exact for arbitrary binary content: invalid bytes become U+FFFD.
+ * This leaves the name "bytes" free for a future mode that renders bytes
+ * verbatim (for example as hex) without the ambiguity of a mode called
+ * "bytes" that silently decodes.
  */
-export type ReadFileMode = "slice" | "indentation"
+export type ReadFileMode = "slice" | "indentation" | "bytes_as_utf8"
 
 /**
  * Indentation-mode configuration for the read_file tool.
@@ -26,6 +33,20 @@ export interface IndentationParams {
 }
 
 /**
+ * Byte-window configuration for the read_file tool.
+ *
+ * Kept in its own object rather than reusing the top-level `offset`/`limit`
+ * because those are 1-based *line* numbers. Silently changing their unit based
+ * on `mode` is how a caller ends up reading byte 1500 when it meant line 1500.
+ */
+export interface BytesAsUtf8Params {
+	/** 0-based byte offset to start reading from (default: 0) */
+	offset?: number
+	/** Maximum number of bytes to read (default: 40960) */
+	limit?: number
+}
+
+/**
  * Parameters for the read_file tool (new format).
  *
  * NOTE: This is the canonical, single-file-per-call shape.
@@ -33,14 +54,22 @@ export interface IndentationParams {
 export interface ReadFileParams {
 	/** Path to the file, relative to workspace */
 	path: string
-	/** Reading mode: "slice" (default) or "indentation" */
+	/** Reading mode: "slice" (default), "indentation", or "bytes_as_utf8" */
 	mode?: ReadFileMode
-	/** 1-based line number to start reading from (slice mode, default: 1) */
+	/**
+	 * 1-based *line* number to start reading from (slice mode, default: 1).
+	 * Ignored when mode === "bytes_as_utf8".
+	 */
 	offset?: number
-	/** Maximum number of lines to read (default: 2000) */
+	/**
+	 * Maximum number of *lines* to read (default: 2000).
+	 * Ignored when mode === "bytes_as_utf8".
+	 */
 	limit?: number
 	/** Indentation-mode configuration (only used when mode === "indentation") */
 	indentation?: IndentationParams
+	/** Byte-window configuration (only used when mode === "bytes_as_utf8") */
+	bytes_as_utf8?: BytesAsUtf8Params
 }
 
 // ─── Legacy Format Types (Backward Compatibility) ─────────────────────────────
