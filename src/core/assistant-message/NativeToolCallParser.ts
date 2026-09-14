@@ -452,6 +452,13 @@ export class NativeToolCallParser {
 										),
 									}
 								: undefined,
+						bytes_as_utf8:
+							partialArgs.bytes_as_utf8 && typeof partialArgs.bytes_as_utf8 === "object"
+								? {
+										offset: this.coerceOptionalNumber(partialArgs.bytes_as_utf8.offset),
+										limit: this.coerceOptionalNumber(partialArgs.bytes_as_utf8.limit),
+									}
+								: undefined,
 					}
 				}
 				break
@@ -779,6 +786,13 @@ export class NativeToolCallParser {
 												args.indentation.include_siblings,
 											),
 											include_header: this.coerceOptionalBoolean(args.indentation.include_header),
+										}
+									: undefined,
+							bytes_as_utf8:
+								args.bytes_as_utf8 && typeof args.bytes_as_utf8 === "object"
+									? {
+											offset: this.coerceOptionalNumber(args.bytes_as_utf8.offset),
+											limit: this.coerceOptionalNumber(args.bytes_as_utf8.limit),
 										}
 									: undefined,
 						} as NativeArgsFor<TName>
