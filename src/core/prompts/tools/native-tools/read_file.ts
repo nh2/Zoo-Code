@@ -5,8 +5,17 @@ import type OpenAI from "openai"
 /** Default maximum lines to return per file (Codex-inspired predictable limit) */
 export const DEFAULT_LINE_LIMIT = 2000
 
-/** Maximum characters per line before truncation */
-export const MAX_LINE_LENGTH = 2000
+/**
+ * Maximum bytes of a single line to display before truncating it.
+ *
+ * Measured in bytes rather than characters so that the cut point can be
+ * reported as a byte offset usable with `mode: "bytes_as_utf8"`. A character
+ * count cannot be converted back into a file offset after a lossy UTF-8 decode.
+ */
+export const MAX_LINE_BYTES = 2000
+
+/** Default byte-window size for `bytes_as_utf8` mode (40KB) */
+export const DEFAULT_BYTE_LIMIT = 40 * 1024
 
 /** Default indentation levels to include above anchor (0 = unlimited) */
 export const DEFAULT_MAX_LEVELS = 0
@@ -65,12 +74,15 @@ export function createReadFileTool(options: ReadFileToolOptions = {}): OpenAI.Ch
 		"Read a file and return its contents with line numbers for diffing or discussion. IMPORTANT: This tool reads exactly one file per call. If you need multiple files, issue multiple parallel read_file calls."
 
 	const modeDescription =
-		` Supports two modes: 'slice' (default) reads lines sequentially with offset/limit; 'indentation' extracts complete semantic code blocks around an anchor line based on indentation hierarchy.` +
+		` Supports three modes: 'slice' (default) reads lines sequentially with offset/limit; 'indentation' extracts complete semantic code blocks around an anchor line based on indentation hierarchy; 'bytes_as_utf8' reads a raw byte window decoded as UTF-8.` +
 		` Slice mode is ideal for initial file exploration, understanding overall structure, reading configuration/data files, or when you need a specific line range. Use it when you don't have a target line number.` +
 		` PREFER indentation mode when you have a specific line number from search results, error messages, or definition lookups - it guarantees complete, syntactically valid code blocks without mid-function truncation.` +
 		` IMPORTANT: Indentation mode requires anchor_line to be useful. Without it, only header content (imports) is returned.`
 
-	const limitNote = ` By default, returns up to ${DEFAULT_LINE_LIMIT} lines per file. Lines longer than ${MAX_LINE_LENGTH} characters are truncated.`
+	const limitNote =
+		` By default, returns up to ${DEFAULT_LINE_LIMIT} lines per file. Lines longer than ${MAX_LINE_BYTES} bytes are truncated for display, with a marker naming the exact byte offsets that were omitted.` +
+		` Line-based modes can only select whole lines, so content past that per-line cap has no line address: to read it, pass those byte offsets to mode='bytes_as_utf8'.` +
+		` That mode is also how to read files with no useful line structure at all (minified assets, single-line JSON, long CSV or log lines).`
 
 	const description =
 		descriptionIntro +
@@ -79,7 +91,8 @@ export function createReadFileTool(options: ReadFileToolOptions = {}): OpenAI.Ch
 		" " +
 		getReadFileSupportsNote(supportsImages) +
 		` Example: { path: 'src/app.ts' }` +
-		` Example (indentation mode): { path: 'src/app.ts', mode: 'indentation', indentation: { anchor_line: 42 } }`
+		` Example (indentation mode): { path: 'src/app.ts', mode: 'indentation', indentation: { anchor_line: 42 } }` +
+		` Example (byte mode): { path: 'data.json', mode: 'bytes_as_utf8', bytes_as_utf8: { offset: 5000, limit: 4096 } }`
 
 	const indentationProperties: Record<string, unknown> = {
 		anchor_line: {
@@ -108,6 +121,18 @@ export function createReadFileTool(options: ReadFileToolOptions = {}): OpenAI.Ch
 		},
 	}
 
+	const bytesAsUtf8Properties: Record<string, unknown> = {
+		offset: {
+			type: "integer",
+			description:
+				"0-based BYTE offset to start reading from (default: 0). This is a byte offset, not a line or column number. Take it from the byte offsets reported in truncation markers.",
+		},
+		limit: {
+			type: "integer",
+			description: `Maximum number of BYTES to read (default: ${DEFAULT_BYTE_LIMIT}).`,
+		},
+	}
+
 	const properties: Record<string, unknown> = {
 		path: {
 			type: "string",
@@ -115,23 +140,32 @@ export function createReadFileTool(options: ReadFileToolOptions = {}): OpenAI.Ch
 		},
 		mode: {
 			type: "string",
-			enum: ["slice", "indentation"],
+			enum: ["slice", "indentation", "bytes_as_utf8"],
 			description:
-				"Reading mode. 'slice' (default): read lines sequentially with offset/limit - use for general file exploration or when you don't have a target line number (may truncate code mid-function). 'indentation': extract complete semantic code blocks containing anchor_line - PREFERRED when you have a line number because it guarantees complete, valid code blocks. WARNING: Do not use indentation mode without specifying indentation.anchor_line, or you will only get header content.",
+				"Reading mode. 'slice' (default): read lines sequentially with offset/limit - use for general file exploration or when you don't have a target line number (may truncate code mid-function). 'indentation': extract complete semantic code blocks containing anchor_line - PREFERRED when you have a line number because it guarantees complete, valid code blocks. WARNING: Do not use indentation mode without specifying indentation.anchor_line, or you will only get header content. 'bytes_as_utf8': read a byte window decoded as UTF-8 - use this to reach content that line-based modes cannot address, namely anything past the per-line truncation cap on a very long line. Invalid bytes decode to U+FFFD, so this mode is not byte-exact for arbitrary binary content.",
 		},
 		offset: {
 			type: "integer",
-			description: "1-based line offset to start reading from (slice mode, default: 1)",
+			description:
+				"1-based LINE offset to start reading from (slice mode, default: 1). Ignored when mode='bytes_as_utf8' - use bytes_as_utf8.offset for byte addressing.",
 		},
 		limit: {
 			type: "integer",
-			description: `Maximum number of lines to return (slice mode, default: ${DEFAULT_LINE_LIMIT})`,
+			description: `Maximum number of LINES to return (slice mode, default: ${DEFAULT_LINE_LIMIT}). Ignored when mode='bytes_as_utf8' - use bytes_as_utf8.limit.`,
 		},
 		indentation: {
 			type: "object",
 			description:
 				"Indentation mode options. Only used when mode='indentation'. You MUST specify anchor_line for useful results - it determines which code block to extract.",
 			properties: indentationProperties,
+			required: [],
+			additionalProperties: false,
+		},
+		bytes_as_utf8: {
+			type: "object",
+			description:
+				"Byte window options. Only used when mode='bytes_as_utf8'. Offsets are 0-based byte offsets into the file, as reported by truncation markers from read_file and search_files.",
+			properties: bytesAsUtf8Properties,
 			required: [],
 			additionalProperties: false,
 		},

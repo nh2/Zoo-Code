@@ -13,18 +13,15 @@
  * 6. Apply line limit
  */
 
-import {
-	DEFAULT_LINE_LIMIT,
-	DEFAULT_MAX_LEVELS,
-	MAX_LINE_LENGTH,
-} from "../../core/prompts/tools/native-tools/read_file"
+import { DEFAULT_LINE_LIMIT, DEFAULT_MAX_LEVELS, MAX_LINE_BYTES } from "../../core/prompts/tools/native-tools/read_file"
+import { countPartialSequenceAtEnd } from "./byte-reader"
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 export interface LineRecord {
 	/** 1-based line number */
 	lineNumber: number
-	/** Original line content */
+	/** Original line content, decoded as UTF-8 */
 	content: string
 	/** Computed indentation level (number of leading whitespace units) */
 	indentLevel: number
@@ -32,6 +29,39 @@ export interface LineRecord {
 	isBlank: boolean
 	/** Whether this line starts a new block (has content followed by colon, brace, etc.) */
 	isBlockStart: boolean
+	/** 0-based byte offset of the first byte of this line within the source */
+	byteOffset: number
+	/** Length of this line in bytes, excluding the terminating newline */
+	byteLength: number
+	/**
+	 * The undecoded bytes of this line.
+	 *
+	 * Retained because display truncation has to cut *bytes* to be able to name
+	 * the byte offset it cut at, and because a decoded string cannot be measured
+	 * back into file offsets: a lossy decode turns each invalid byte into U+FFFD,
+	 * which re-encodes to three bytes where the original was one.
+	 *
+	 * This is a `subarray` of the source buffer, so it shares memory and costs
+	 * nothing to keep.
+	 */
+	raw: Buffer
+}
+
+/**
+ * A line whose display was cut short, described in byte offsets so that the
+ * omitted part can be fetched with `mode: "bytes_as_utf8"`.
+ */
+export interface LineTruncation {
+	/** 1-based line number of the truncated line */
+	lineNumber: number
+	/** Total length of the line in bytes */
+	lineByteLength: number
+	/** Number of bytes omitted */
+	omittedBytes: number
+	/** 0-based byte offset of the first omitted byte */
+	omittedStartOffset: number
+	/** 0-based byte offset of the last omitted byte (inclusive) */
+	omittedEndOffset: number
 }
 
 export interface IndentationReadOptions {
@@ -60,6 +90,8 @@ export interface IndentationReadResult {
 	returnedLines: number
 	/** Whether output was truncated due to limit */
 	wasTruncated: boolean
+	/** Lines whose display was cut short by the per-line byte cap */
+	truncatedLines: LineTruncation[]
 }
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -105,37 +137,77 @@ const COMMENT_PREFIXES = ["#", "//", "--", "/*", "*", "'''", '"""']
 // ─── Core Functions ───────────────────────────────────────────────────────────
 
 /**
- * Parse a file's lines into LineRecord objects with indentation information.
+ * Parse a file's lines into LineRecord objects with indentation and byte offsets.
+ *
+ * Line boundaries are found by scanning the *buffer* for 0x0A rather than by
+ * splitting the decoded string. This is what makes the reported byte offsets
+ * true file offsets: decoding first would map every invalid byte to U+FFFD,
+ * which re-encodes to three bytes where the original was one, so offsets
+ * measured from the decoded text drift on exactly the machine-generated files
+ * that need byte addressing in the first place.
+ *
+ * Accepts a string for convenience; callers that have the raw bytes should pass
+ * the Buffer, since encoding a string that was itself lossily decoded cannot
+ * recover the original offsets.
  */
-export function parseLines(content: string): LineRecord[] {
-	const lines = content.split("\n")
-	return lines.map((line, index) => {
-		const trimmed = line.trimStart()
-		const leadingWhitespace = line.length - trimmed.length
+export function parseLines(content: string | Buffer): LineRecord[] {
+	const buffer = Buffer.isBuffer(content) ? content : Buffer.from(content, "utf8")
+	const records: LineRecord[] = []
 
-		// Calculate indent in spaces (tabs = TAB_WIDTH spaces each)
-		let indentSpaces = 0
-		for (let i = 0; i < leadingWhitespace; i++) {
-			if (line[i] === "\t") {
-				indentSpaces += TAB_WIDTH
-			} else {
-				indentSpaces += 1
-			}
+	let lineStart = 0
+	let lineNumber = 1
+
+	// `indexOf` on a Buffer is a native memchr rather than a JS loop, so the scan
+	// costs about what `split("\n")` would while yielding true byte offsets.
+	while (lineStart <= buffer.length) {
+		const newlineIdx = buffer.indexOf(0x0a, lineStart)
+		const lineEnd = newlineIdx === -1 ? buffer.length : newlineIdx
+
+		records.push(makeLineRecord(buffer.subarray(lineStart, lineEnd), lineNumber, lineStart))
+
+		if (newlineIdx === -1) break
+
+		// A trailing newline yields a final empty line, matching `String.split("\n")`.
+		lineStart = newlineIdx + 1
+		lineNumber++
+	}
+
+	return records
+}
+
+/**
+ * Build a single LineRecord from the raw bytes of one line.
+ */
+function makeLineRecord(raw: Buffer, lineNumber: number, byteOffset: number): LineRecord {
+	const line = raw.toString("utf8")
+	const trimmed = line.trimStart()
+	const leadingWhitespace = line.length - trimmed.length
+
+	// Calculate indent in spaces (tabs = TAB_WIDTH spaces each)
+	let indentSpaces = 0
+	for (let i = 0; i < leadingWhitespace; i++) {
+		if (line[i] === "\t") {
+			indentSpaces += TAB_WIDTH
+		} else {
+			indentSpaces += 1
 		}
-		// Convert to indent level (number of INDENT_SIZE units)
-		const indentLevel = Math.floor(indentSpaces / INDENT_SIZE)
+	}
+	// Convert to indent level (number of INDENT_SIZE units)
+	const indentLevel = Math.floor(indentSpaces / INDENT_SIZE)
 
-		const isBlank = trimmed.length === 0
-		const isBlockStart = !isBlank && BLOCK_START_PATTERNS.some((pattern) => pattern.test(line))
+	const isBlank = trimmed.length === 0
+	const isBlockStart = !isBlank && BLOCK_START_PATTERNS.some((pattern) => pattern.test(line))
 
-		return {
-			lineNumber: index + 1,
-			content: line,
-			indentLevel,
-			isBlank,
-			isBlockStart,
-		}
-	})
+	return {
+		lineNumber,
+		content: line,
+		indentLevel,
+		isBlank,
+		isBlockStart,
+		byteOffset,
+		byteLength: raw.length,
+		raw,
+	}
 }
 
 /**
@@ -225,25 +297,87 @@ function findHeaderEnd(lines: LineRecord[]): number {
 }
 
 /**
- * Format lines with line numbers, applying truncation to long lines.
+ * Render the marker that replaces the omitted tail of a truncated line.
+ *
+ * Both endpoints are named, and inclusively, so that the next call needs no
+ * arithmetic: `omittedStartOffset` goes straight into `bytes_as_utf8.offset`,
+ * and the end offset gives the size of what is missing without a probing read.
  */
-export function formatWithLineNumbers(lines: LineRecord[], maxLineLength: number = MAX_LINE_LENGTH): string {
-	if (lines.length === 0) return ""
+export function formatTruncationMarker(truncation: LineTruncation): string {
+	const plural = truncation.omittedBytes === 1 ? "byte" : "bytes"
+	return (
+		`[+${truncation.omittedBytes} ${plural} omitted, ` +
+		`starting at byte offset ${truncation.omittedStartOffset} ` +
+		`up to and including byte offset ${truncation.omittedEndOffset}]`
+	)
+}
+
+/**
+ * Format lines with line numbers, truncating over-long lines for display.
+ *
+ * The cap is applied to bytes rather than characters so the cut point can be
+ * named as a byte offset. Cutting mid-sequence is avoided by backing up to the
+ * nearest UTF-8 boundary; the full `maxLineBytes` budget goes to content, with
+ * the marker appended outside it.
+ */
+export function formatWithLineNumbers(
+	lines: LineRecord[],
+	maxLineBytes: number = MAX_LINE_BYTES,
+): { content: string; truncatedLines: LineTruncation[] } {
+	if (lines.length === 0) return { content: "", truncatedLines: [] }
 	const maxLineNumWidth = String(lines[lines.length - 1]?.lineNumber || 1).length
+	const truncatedLines: LineTruncation[] = []
 
-	return lines
-		.map((line) => {
-			const lineNum = String(line.lineNumber).padStart(maxLineNumWidth, " ")
-			let content = line.content
+	const rendered = lines.map((line) => {
+		const lineNum = String(line.lineNumber).padStart(maxLineNumWidth, " ")
 
-			// Truncate long lines
-			if (content.length > maxLineLength) {
-				content = content.substring(0, maxLineLength - 3) + "..."
-			}
+		if (line.byteLength <= maxLineBytes) {
+			return `${lineNum} | ${line.content}`
+		}
 
-			return `${lineNum} | ${content}`
-		})
-		.join("\n")
+		// Back off any sequence the cut would have split, so the kept part decodes
+		// cleanly instead of ending in a U+FFFD that looks like file content.
+		const head = line.raw.subarray(0, maxLineBytes)
+		const keptBytes = maxLineBytes - countPartialSequenceAtEnd(head)
+
+		const omittedStartOffset = line.byteOffset + keptBytes
+		const omittedEndOffset = line.byteOffset + line.byteLength - 1
+
+		const truncation: LineTruncation = {
+			lineNumber: line.lineNumber,
+			lineByteLength: line.byteLength,
+			omittedBytes: line.byteLength - keptBytes,
+			omittedStartOffset,
+			omittedEndOffset,
+		}
+		truncatedLines.push(truncation)
+
+		const content = line.raw.subarray(0, keptBytes).toString("utf8")
+		return `${lineNum} | ${content}${formatTruncationMarker(truncation)}`
+	})
+
+	return { content: rendered.join("\n"), truncatedLines }
+}
+
+/**
+ * Summarise per-line truncations, naming the call that retrieves the rest.
+ *
+ * Per-line markers are easy to skim past in a long listing, so the same
+ * information is repeated once as a block with an explicit next step.
+ */
+export function formatTruncationSummary(truncatedLines: LineTruncation[]): string {
+	if (truncatedLines.length === 0) return ""
+
+	const first = truncatedLines[0]
+	const lineWord = truncatedLines.length === 1 ? "line" : "lines"
+	const longest = truncatedLines.reduce((max, t) => Math.max(max, t.lineByteLength), 0)
+
+	return (
+		`\n\nNote: ${truncatedLines.length} ${lineWord} exceeded the ${MAX_LINE_BYTES}-byte per-line display cap ` +
+		`(longest: ${longest} bytes). The omitted bytes have no line-based address.` +
+		`\nTo read the omitted part of line ${first.lineNumber}: read_file with mode='bytes_as_utf8' and ` +
+		`bytes_as_utf8.offset=${first.omittedStartOffset}.`
+	)
 }
 
 /**
@@ -281,11 +415,13 @@ function computeIncludedRanges(lines: LineRecord[]): Array<[number, number]> {
  *
  * Uses bidirectional expansion from the anchor line with sibling exclusion counters.
  *
- * @param content - The file content to process
+ * @param content - The file content to process. Pass a Buffer when available:
+ *   the byte offsets reported for truncated lines are only true file offsets if
+ *   they were measured from the original bytes.
  * @param options - Extraction options
  * @returns The extracted content with metadata
  */
-export function readWithIndentation(content: string, options: IndentationReadOptions): IndentationReadResult {
+export function readWithIndentation(content: string | Buffer, options: IndentationReadOptions): IndentationReadResult {
 	const {
 		anchorLine,
 		maxLevels = DEFAULT_MAX_LEVELS,
@@ -306,6 +442,7 @@ export function readWithIndentation(content: string, options: IndentationReadOpt
 			totalLines,
 			returnedLines: 0,
 			wasTruncated: false,
+			truncatedLines: [],
 		}
 	}
 
@@ -332,12 +469,14 @@ export function readWithIndentation(content: string, options: IndentationReadOpt
 	// Edge case: if limit is 1, just return the anchor line
 	if (finalLimit === 1) {
 		const singleLine = [lines[anchorIdx]]
+		const formatted = formatWithLineNumbers(singleLine)
 		return {
-			content: formatWithLineNumbers(singleLine),
+			content: formatted.content,
 			includedRanges: [[anchorLine, anchorLine]],
 			totalLines,
 			returnedLines: 1,
 			wasTruncated: totalLines > 1,
+			truncatedLines: formatted.truncatedLines,
 		}
 	}
 
@@ -409,30 +548,33 @@ export function readWithIndentation(content: string, options: IndentationReadOpt
 	const wasTruncated = result.length >= finalLimit || i >= 0 || j < lines.length
 
 	// Format output
-	const formattedContent = formatWithLineNumbers(result)
+	const formatted = formatWithLineNumbers(result)
 
 	// Compute included ranges
 	const includedRanges = computeIncludedRanges(result)
 
 	return {
-		content: formattedContent,
+		content: formatted.content,
 		includedRanges,
 		totalLines,
 		returnedLines: result.length,
 		wasTruncated: wasTruncated && result.length < totalLines,
+		truncatedLines: formatted.truncatedLines,
 	}
 }
 
 /**
  * Simple slice mode reading - read lines with offset/limit.
  *
- * @param content - The file content to process
+ * @param content - The file content to process. Pass a Buffer when available:
+ *   the byte offsets reported for truncated lines are only true file offsets if
+ *   they were measured from the original bytes.
  * @param offset - 0-based line offset to start from (default: 0)
  * @param limit - Maximum lines to return (default: 2000)
  * @returns The extracted content with metadata
  */
 export function readWithSlice(
-	content: string,
+	content: string | Buffer,
 	offset: number = 0,
 	limit: number = DEFAULT_LINE_LIMIT,
 ): IndentationReadResult {
@@ -448,6 +590,7 @@ export function readWithSlice(
 			totalLines,
 			returnedLines: 0,
 			wasTruncated: false,
+			truncatedLines: [],
 		}
 	}
 
@@ -457,13 +600,14 @@ export function readWithSlice(
 	const wasTruncated = endIdx < totalLines
 
 	// Format output
-	const formattedContent = formatWithLineNumbers(selectedLines)
+	const formatted = formatWithLineNumbers(selectedLines)
 
 	return {
-		content: formattedContent,
+		content: formatted.content,
 		includedRanges: [[offset + 1, endIdx]], // 1-based
 		totalLines,
 		returnedLines: selectedLines.length,
 		wasTruncated,
+		truncatedLines: formatted.truncatedLines,
 	}
 }
