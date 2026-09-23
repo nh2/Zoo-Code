@@ -135,26 +135,28 @@ describe("AwsBedrockHandler", () => {
 	)
 
 	it.each([
-		["anthropic.claude-sonnet-4-5-20250929-v1:0", 64_000],
-		["anthropic.claude-sonnet-4-6", 64_000],
-		["anthropic.claude-sonnet-5", 128_000],
-		["anthropic.claude-opus-4-7", 128_000],
-		["anthropic.claude-opus-4-8", 128_000],
-		["anthropic.claude-opus-5", 128_000],
-	] as const)("exposes %s output ceiling without raising request defaults", async (apiModelId, ceiling) => {
+		["anthropic.claude-sonnet-4-5-20250929-v1:0", 64_000, undefined],
+		["anthropic.claude-sonnet-4-6", 64_000, undefined],
+		// Binary-reasoning models resolve from their own ceiling, clamped to 20% of the context window.
+		["anthropic.claude-sonnet-5", 128_000, 128_000],
+		["anthropic.claude-opus-4-7", 128_000, 40_000],
+		["anthropic.claude-opus-4-8", 128_000, 40_000],
+		["anthropic.claude-opus-5", 128_000, 128_000],
+	] as const)("exposes %s output ceiling", async (apiModelId, ceiling, binaryReasoningDefault) => {
 		for (const enableReasoningEffort of [true, false]) {
 			for (const modelMaxTokens of [undefined, ceiling]) {
 				const provider = new AwsBedrockHandler({ apiModelId, enableReasoningEffort, modelMaxTokens })
 				expect(provider.getModel().info.maxTokens).toBe(ceiling)
 				provider["client"].send = vi.fn().mockResolvedValue({ stream: asyncStreamFrom([]) })
 				await collectStream(provider.createMessage("system", [{ role: "user", content: "hello" }]))
-				const configurableWithoutReasoning = apiModelId.endsWith("-5")
 				const expected =
-					modelMaxTokens && (enableReasoningEffort || configurableWithoutReasoning)
-						? ceiling
-						: enableReasoningEffort
-							? 16_384
-							: 8192
+					binaryReasoningDefault !== undefined
+						? (modelMaxTokens ?? binaryReasoningDefault)
+						: modelMaxTokens && enableReasoningEffort
+							? ceiling
+							: enableReasoningEffort
+								? 16_384
+								: 8192
 				expect(mockConverseStreamCommand).toHaveBeenLastCalledWith(
 					expect.objectContaining({
 						inferenceConfig: expect.objectContaining({ maxTokens: expected }),
@@ -896,7 +898,8 @@ describe("AwsBedrockHandler", () => {
 			expect(model.info.supportsReasoningBudget).toBe(true)
 			expect(model.info.supportsPromptCache).toBe(true)
 			expect(model.info.supportsTemperature).toBe(false)
-			expect(model.maxTokens).toBe(8192)
+			// The resolved output budget, not the registry value. See getModelMaxOutputTokens.
+			expect(model.maxTokens).toBe(128_000)
 		})
 
 		it("should return Claude Fable 5.1 model info", () => {
@@ -917,7 +920,7 @@ describe("AwsBedrockHandler", () => {
 			expect(model.info.supportsReasoningBudget).toBe(true)
 			expect(model.info.supportsPromptCache).toBe(true)
 			expect(model.info.supportsTemperature).toBe(false)
-			expect(model.maxTokens).toBe(8192)
+			expect(model.maxTokens).toBe(128_000)
 		})
 
 		it("should apply global inference prefix for Claude Fable 5.1 when awsUseGlobalInference is true", () => {
@@ -961,7 +964,7 @@ describe("AwsBedrockHandler", () => {
 			expect(model.info.supportsReasoningBudget).toBe(true)
 			expect(model.info.supportsPromptCache).toBe(true)
 			expect(model.info.supportsTemperature).toBe(false)
-			expect(model.maxTokens).toBe(8192)
+			expect(model.maxTokens).toBe(128_000)
 		})
 
 		it("should apply global inference prefix for Claude Sonnet 5 when awsUseGlobalInference is true", () => {
@@ -992,7 +995,7 @@ describe("AwsBedrockHandler", () => {
 			expect(model.info.supportsReasoningBudget).toBe(true)
 			expect(model.info.supportsPromptCache).toBe(true)
 			expect(model.info.supportsTemperature).toBe(false)
-			expect(model.maxTokens).toBe(8192)
+			expect(model.maxTokens).toBe(128_000)
 		})
 
 		it("should apply global inference prefix for Claude Opus 5 when awsUseGlobalInference is true", () => {
@@ -1852,6 +1855,81 @@ describe("AwsBedrockHandler", () => {
 			expect(commandArg.additionalModelRequestFields ?? {}).not.toHaveProperty("thinking")
 			expect(commandArg.inferenceConfig?.temperature).toBeUndefined()
 		})
+
+		// Unlike the getModel() tests above, these pin the budget that reaches the wire.
+		it("should send the model's full output ceiling for Claude Opus 5 with reasoning disabled", async () => {
+			const opus5Handler = new AwsBedrockHandler({
+				apiModelId: "anthropic.claude-opus-5",
+				awsAccessKey: "test-access-key",
+				awsSecretKey: "test-secret-key",
+				awsRegion: "us-east-1",
+				enableReasoningEffort: false,
+			})
+
+			const generator = opus5Handler.createMessage("System prompt", messages)
+			await generator.next()
+
+			// `additionalModelRequestFields` is a loosely-typed DocumentType, so narrow it to
+			// the one key under test rather than reaching for `any`.
+			const commandArg = mockConverseStreamCommand.mock.calls[0][0]
+			const additionalFields = commandArg.additionalModelRequestFields as { thinking?: unknown } | undefined
+			// Omitting thinking would enable it by default on Opus 5.
+			expect(additionalFields?.thinking).toEqual({ type: "disabled" })
+			expect(commandArg.inferenceConfig?.maxTokens).toBe(128_000)
+		})
+
+		it("should send the model's full output ceiling for Claude Opus 5 with reasoning enabled", async () => {
+			const opus5Handler = new AwsBedrockHandler({
+				apiModelId: "anthropic.claude-opus-5",
+				awsAccessKey: "test-access-key",
+				awsSecretKey: "test-secret-key",
+				awsRegion: "us-east-1",
+				enableReasoningEffort: true,
+			})
+
+			const generator = opus5Handler.createMessage("System prompt", messages)
+			await generator.next()
+
+			const commandArg = mockConverseStreamCommand.mock.calls[0][0]
+			expect(commandArg.inferenceConfig?.maxTokens).toBe(128_000)
+		})
+
+		it("should clamp the output budget to 20% of the context window on the 200K models", async () => {
+			// opus-4-7 declares contextWindow 200_000, so the clamp yields min(128_000, 40_000).
+			const opus47Handler = new AwsBedrockHandler({
+				apiModelId: "anthropic.claude-opus-4-7",
+				awsAccessKey: "test-access-key",
+				awsSecretKey: "test-secret-key",
+				awsRegion: "us-east-1",
+				enableReasoningEffort: false,
+			})
+
+			const generator = opus47Handler.createMessage("System prompt", messages)
+			await generator.next()
+
+			const commandArg = mockConverseStreamCommand.mock.calls[0][0]
+			expect(commandArg.inferenceConfig?.maxTokens).toBe(40_000)
+		})
+
+		it.each([true, false])(
+			"should honor a user-set modelMaxTokens with reasoning %s",
+			async (enableReasoningEffort) => {
+				const opus5Handler = new AwsBedrockHandler({
+					apiModelId: "anthropic.claude-opus-5",
+					awsAccessKey: "test-access-key",
+					awsSecretKey: "test-secret-key",
+					awsRegion: "us-east-1",
+					enableReasoningEffort,
+					modelMaxTokens: 64_000,
+				})
+
+				const generator = opus5Handler.createMessage("System prompt", messages)
+				await generator.next()
+
+				const commandArg = mockConverseStreamCommand.mock.calls[0][0]
+				expect(commandArg.inferenceConfig?.maxTokens).toBe(64_000)
+			},
+		)
 
 		it("should still send temperature and budget_tokens thinking for older Claude Opus 4.6", async () => {
 			// Regression guard: the adaptive-thinking branch must NOT activate for 4.6 or earlier.

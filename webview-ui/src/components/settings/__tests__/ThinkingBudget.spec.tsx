@@ -80,24 +80,34 @@ describe("ThinkingBudget", () => {
 	})
 
 	it.each([
-		["anthropic.claude-sonnet-4-5-20250929-v1:0", 64_000],
-		["anthropic.claude-opus-4-8", 128_000],
-		["anthropic.claude-sonnet-5", 128_000],
-		["anthropic.claude-opus-5", 128_000],
-	] as const)("allows selecting the documented Bedrock output ceiling for %s", (apiModelId, ceiling) => {
-		render(
-			<ThinkingBudget
-				{...defaultProps}
-				apiConfiguration={{ apiProvider: providerIdentifiers.bedrock, apiModelId, enableReasoningEffort: true }}
-				modelInfo={bedrockModels[apiModelId]}
-			/>,
-		)
-		const outputSlider = screen.getAllByTestId("slider")[0]
-		expect(outputSlider).toHaveAttribute("max", String(ceiling))
-		expect(outputSlider).toHaveValue("16384")
-		fireEvent.change(outputSlider, { target: { value: String(ceiling) } })
-		expect(defaultProps.setApiConfigurationField).toHaveBeenCalledWith("modelMaxTokens", ceiling)
-	})
+		["anthropic.claude-sonnet-4-5-20250929-v1:0", 64_000, 16_384],
+		// Binary-reasoning models default to the budget the runtime sends: their ceiling, clamped to 20% of the context window.
+		["anthropic.claude-opus-4-8", 128_000, 40_000],
+		["anthropic.claude-sonnet-5", 128_000, 128_000],
+		["anthropic.claude-opus-5", 128_000, 128_000],
+	] as const)(
+		"allows selecting the documented Bedrock output ceiling for %s",
+		(apiModelId, ceiling, defaultValue) => {
+			render(
+				<ThinkingBudget
+					{...defaultProps}
+					apiConfiguration={{
+						apiProvider: providerIdentifiers.bedrock,
+						apiModelId,
+						enableReasoningEffort: true,
+					}}
+					modelInfo={bedrockModels[apiModelId]}
+				/>,
+			)
+			const outputSlider = screen.getAllByTestId("slider")[0]
+			expect(outputSlider).toHaveAttribute("max", String(ceiling))
+			expect(outputSlider).toHaveValue(String(defaultValue))
+			// Move away from the default first so a no-op change cannot mask a missing handler.
+			const target = defaultValue === ceiling ? 32_768 : ceiling
+			fireEvent.change(outputSlider, { target: { value: String(target) } })
+			expect(defaultProps.setApiConfigurationField).toHaveBeenCalledWith("modelMaxTokens", target)
+		},
+	)
 
 	it("should render nothing when model information is unavailable", () => {
 		const { container } = render(<ThinkingBudget {...defaultProps} modelInfo={undefined} />)
@@ -751,6 +761,81 @@ describe("ThinkingBudget", () => {
 
 			expect(screen.queryByTestId("max-output-tokens")).not.toBeInTheDocument()
 			expect(screen.getByTestId("reasoning-effort")).toBeInTheDocument()
+		})
+
+		// Adaptive-thinking Claude models set BOTH binary reasoning and reasoning budget.
+		const adaptiveThinkingModelInfo: ModelInfo = {
+			supportsMaxTokens: true,
+			supportsReasoningBinary: true,
+			supportsReasoningBudget: true,
+			supportsTemperature: false,
+			maxTokens: 128_000,
+			contextWindow: 1_000_000,
+			supportsPromptCache: true,
+		}
+
+		const adaptiveThinkingApiConfiguration = {
+			apiProvider: providerIdentifiers.bedrock,
+			apiModelId: "anthropic.claude-opus-5",
+		} as const
+
+		it("should render the max output slider for a binary-reasoning model that supports max tokens", () => {
+			render(
+				<ThinkingBudget
+					{...defaultProps}
+					apiConfiguration={adaptiveThinkingApiConfiguration}
+					modelInfo={adaptiveThinkingModelInfo}
+				/>,
+			)
+
+			expect(screen.getByTestId("max-output-tokens")).toBeInTheDocument()
+			expect(screen.getByRole("checkbox")).toBeInTheDocument()
+			// The budget slider must NOT appear: this API rejects budget_tokens.
+			expect(screen.queryByTestId("reasoning-budget")).not.toBeInTheDocument()
+		})
+
+		it("should not render the max output slider for a binary-reasoning model without supportsMaxTokens", () => {
+			render(
+				<ThinkingBudget
+					{...defaultProps}
+					apiConfiguration={adaptiveThinkingApiConfiguration}
+					modelInfo={{ ...adaptiveThinkingModelInfo, supportsMaxTokens: undefined }}
+				/>,
+			)
+
+			expect(screen.queryByTestId("max-output-tokens")).not.toBeInTheDocument()
+			expect(screen.getByRole("checkbox")).toBeInTheDocument()
+		})
+
+		it("should persist a slider edit for a binary-reasoning model", () => {
+			const setApiConfigurationField = vi.fn()
+			render(
+				<ThinkingBudget
+					{...defaultProps}
+					setApiConfigurationField={setApiConfigurationField}
+					apiConfiguration={adaptiveThinkingApiConfiguration}
+					modelInfo={adaptiveThinkingModelInfo}
+				/>,
+			)
+
+			const slider = screen.getByTestId("max-output-tokens").querySelector("input[type='range']")!
+			fireEvent.change(slider, { target: { value: "65536" } })
+
+			expect(setApiConfigurationField).toHaveBeenCalledWith("modelMaxTokens", 65536)
+		})
+
+		it("should default the binary-reasoning slider to the resolved output budget", () => {
+			render(
+				<ThinkingBudget
+					{...defaultProps}
+					apiConfiguration={adaptiveThinkingApiConfiguration}
+					modelInfo={adaptiveThinkingModelInfo}
+				/>,
+			)
+
+			// min(128_000, 20% of 1M) = 128_000 — the same value the runtime sends.
+			const slider = screen.getByTestId("max-output-tokens").querySelector("input[type='range']")!
+			expect(slider).toHaveValue("128000")
 		})
 	})
 })
