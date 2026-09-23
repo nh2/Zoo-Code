@@ -647,7 +647,7 @@ describe("RequestyHandler", () => {
 
 			expect(mockCreate).toHaveBeenCalledWith({
 				model: "anthropic/claude-fable-5",
-				max_tokens: 8192,
+				max_tokens: 128_000,
 				messages: [{ role: "system", content: "test prompt" }],
 				temperature: undefined,
 			})
@@ -666,7 +666,7 @@ describe("RequestyHandler", () => {
 
 			expect(mockCreate).toHaveBeenCalledWith({
 				model: "anthropic/claude-sonnet-5",
-				max_tokens: 8192,
+				max_tokens: 128_000,
 				messages: [{ role: "system", content: "test prompt" }],
 				temperature: undefined,
 			})
@@ -685,7 +685,7 @@ describe("RequestyHandler", () => {
 
 			expect(mockCreate).toHaveBeenCalledWith({
 				model: "anthropic/claude-opus-5",
-				max_tokens: 8192,
+				max_tokens: 128_000,
 				messages: [{ role: "system", content: "test prompt" }],
 				temperature: undefined,
 			})

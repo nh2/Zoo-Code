@@ -251,7 +251,7 @@ describe("AnthropicHandler", () => {
 
 			const requestBody = mockCreate.mock.calls[mockCreate.mock.calls.length - 1]?.[0]
 			expect(requestBody?.thinking).toEqual({ type: "adaptive", display: "summarized" })
-			expect(requestBody?.max_tokens).toBe(16384)
+			expect(requestBody?.max_tokens).toBe(128_000)
 		})
 
 		it("should omit thinking for Claude Opus 4.7 when reasoning is disabled", async () => {
@@ -272,7 +272,8 @@ describe("AnthropicHandler", () => {
 
 			const requestBody = mockCreate.mock.calls[mockCreate.mock.calls.length - 1]?.[0]
 			expect(requestBody?.thinking).toBeUndefined()
-			expect(requestBody?.max_tokens).toBe(8192)
+			// Opus 4.7 doesn't think without a thinking payload; the ceiling is shared with reasoning-on.
+			expect(requestBody?.max_tokens).toBe(128_000)
 		})
 
 		it("should preserve custom maxTokens for Claude Opus 4.7 when reasoning is enabled", async () => {
@@ -338,7 +339,7 @@ describe("AnthropicHandler", () => {
 
 			const requestBody = mockCreate.mock.calls[mockCreate.mock.calls.length - 1]?.[0]
 			expect(requestBody?.thinking).toEqual({ type: "adaptive", display: "summarized" })
-			expect(requestBody?.max_tokens).toBe(16384)
+			expect(requestBody?.max_tokens).toBe(128_000)
 		})
 
 		it("should omit thinking for Claude Opus 4.8 when reasoning is disabled", async () => {
@@ -359,7 +360,7 @@ describe("AnthropicHandler", () => {
 
 			const requestBody = mockCreate.mock.calls[mockCreate.mock.calls.length - 1]?.[0]
 			expect(requestBody?.thinking).toBeUndefined()
-			expect(requestBody?.max_tokens).toBe(8192)
+			expect(requestBody?.max_tokens).toBe(128_000)
 		})
 
 		it("should preserve custom maxTokens for Claude Opus 4.8 when reasoning is enabled", async () => {
@@ -1277,7 +1278,7 @@ describe("AnthropicHandler", () => {
 			expect(model.id).toBe("claude-opus-4-7")
 			expect(model.info.maxTokens).toBe(128000)
 			expect(model.info.contextWindow).toBe(1000000)
-			expect(model.maxTokens).toBe(8192)
+			expect(model.maxTokens).toBe(128000)
 			expect(model.info.supportsReasoningBinary).toBe(true)
 			expect(model.info.supportsReasoningBudget).toBe(true)
 			expect(model.info.supportsPromptCache).toBe(true)
@@ -1293,7 +1294,7 @@ describe("AnthropicHandler", () => {
 			expect(model.id).toBe("claude-opus-4-8")
 			expect(model.info.maxTokens).toBe(128000)
 			expect(model.info.contextWindow).toBe(1000000)
-			expect(model.maxTokens).toBe(8192)
+			expect(model.maxTokens).toBe(128000)
 			expect(model.info.supportsReasoningBinary).toBe(true)
 			expect(model.info.supportsReasoningBudget).toBe(true)
 			expect(model.info.supportsPromptCache).toBe(true)
@@ -1310,7 +1311,7 @@ describe("AnthropicHandler", () => {
 			expect(model.id).toBe("claude-fable-5")
 			expect(model.info.maxTokens).toBe(128000)
 			expect(model.info.contextWindow).toBe(1000000)
-			expect(model.maxTokens).toBe(8192)
+			expect(model.maxTokens).toBe(128000)
 			expect(model.info.supportsReasoningBinary).toBe(true)
 			expect(model.info.supportsReasoningBudget).toBe(true)
 			expect(model.info.supportsPromptCache).toBe(true)
@@ -1327,7 +1328,7 @@ describe("AnthropicHandler", () => {
 			expect(model.id).toBe("claude-fable-5-1")
 			expect(model.info.maxTokens).toBe(128000)
 			expect(model.info.contextWindow).toBe(1000000)
-			expect(model.maxTokens).toBe(8192)
+			expect(model.maxTokens).toBe(128000)
 			expect(model.info.inputPrice).toBe(10)
 			expect(model.info.outputPrice).toBe(50)
 			expect(model.info.cacheWritesPrice).toBe(12.5)
@@ -1348,7 +1349,7 @@ describe("AnthropicHandler", () => {
 			expect(model.id).toBe("claude-sonnet-5")
 			expect(model.info.maxTokens).toBe(128000)
 			expect(model.info.contextWindow).toBe(1000000)
-			expect(model.maxTokens).toBe(8192)
+			expect(model.maxTokens).toBe(128000)
 			expect(model.info.supportsReasoningBinary).toBe(true)
 			expect(model.info.supportsReasoningBudget).toBe(true)
 			expect(model.info.supportsPromptCache).toBe(true)
@@ -1365,7 +1366,7 @@ describe("AnthropicHandler", () => {
 			expect(model.id).toBe("claude-opus-5")
 			expect(model.info.maxTokens).toBe(128000)
 			expect(model.info.contextWindow).toBe(1000000)
-			expect(model.maxTokens).toBe(8192)
+			expect(model.maxTokens).toBe(128000)
 			expect(model.info.supportsReasoningBinary).toBe(true)
 			expect(model.info.supportsReasoningBudget).toBe(true)
 			expect(model.info.supportsPromptCache).toBe(true)
@@ -1386,7 +1387,8 @@ describe("AnthropicHandler", () => {
 			expect(model.info.outputPrice).toBe(20.0)
 			expect(model.info.cacheWritesPrice).toBe(5.0)
 			expect(model.info.cacheReadsPrice).toBe(0.2)
-			expect(model.maxTokens).toBe(128000)
+			// The resolved output budget, not the registry value. See getModelMaxOutputTokens.
+			expect(model.maxTokens).toBe(128_000)
 			expect(model.info.supportsReasoningBinary).toBe(true)
 			expect(model.info.supportsReasoningBudget).toBeUndefined()
 			expect(model.info.supportsPromptCache).toBe(true)
@@ -1407,9 +1409,8 @@ describe("AnthropicHandler", () => {
 			expect(model.info.outputPrice).toBe(0.5)
 			expect(model.info.cacheWritesPrice).toBe(0.125)
 			expect(model.info.cacheReadsPrice).toBe(0.01)
-			// Hybrid reasoning model with the reasoning toggle off: the request
-			// budget clamps to the Anthropic default, matching Sonnet 5 / Opus 5.
-			expect(model.maxTokens).toBe(8192)
+			// Binary-reasoning models resolve from their own ceiling, matching Sonnet 5 / Opus 5.
+			expect(model.maxTokens).toBe(128_000)
 			expect(model.info.supportsReasoningBinary).toBe(true)
 			expect(model.info.supportsReasoningBudget).toBe(true)
 			expect(model.info.supportsPromptCache).toBe(true)
