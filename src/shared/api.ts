@@ -114,6 +114,16 @@ export const getModelMaxOutputTokens = ({
 	settings?: ProviderSettings
 	format?: "anthropic" | "openai" | "gemini" | "openrouter"
 }): number | undefined => {
+	// Most binary-reasoning models still think with reasoning off (Opus 4.7/4.8 don't),
+	// so the hybrid defaults below leave no room for a thinking pass.
+	if (model.supportsReasoningBinary && model.maxTokens) {
+		if (settings?.modelMaxTokens != null && settings.modelMaxTokens > 0) {
+			return Math.min(settings.modelMaxTokens, model.maxTokens)
+		}
+
+		return Math.min(model.maxTokens, Math.ceil(model.contextWindow * 0.2))
+	}
+
 	if (shouldUseReasoningBudget({ model, settings })) {
 		return settings?.modelMaxTokens || DEFAULT_HYBRID_REASONING_MODEL_MAX_TOKENS
 	}

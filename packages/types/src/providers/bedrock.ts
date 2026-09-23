@@ -192,6 +192,8 @@ export const bedrockModels = {
 		supportsImages: true,
 		supportsPromptCache: true,
 		supportsReasoningBudget: true,
+		supportsReasoningBinary: true,
+		supportsMaxTokens: true,
 		inputPrice: 5.0, // $5 per million input tokens (≤200K context) — verify against Bedrock console
 		outputPrice: 25.0, // $25 per million output tokens (≤200K context) — verify against Bedrock console
 		cacheWritesPrice: 6.25, // $6.25 per million tokens
@@ -216,6 +218,8 @@ export const bedrockModels = {
 		supportsImages: true,
 		supportsPromptCache: true,
 		supportsReasoningBudget: true,
+		supportsReasoningBinary: true,
+		supportsMaxTokens: true,
 		inputPrice: 5.0, // $5 per million input tokens (≤200K context) — verify against Bedrock console
 		outputPrice: 25.0, // $25 per million output tokens (≤200K context) — verify against Bedrock console
 		cacheWritesPrice: 6.25, // $6.25 per million tokens
@@ -284,6 +288,7 @@ export const bedrockModels = {
 		supportsPromptCache: true,
 		supportsReasoningBudget: true,
 		supportsReasoningBinary: true,
+		supportsMaxTokens: true,
 		supportsTemperature: false,
 		inputPrice: 10.0,
 		outputPrice: 50.0,
@@ -296,12 +301,13 @@ export const bedrockModels = {
 			"Claude Fable 5.1 extends Fable 5 with stronger long-running agentic coding, multistep research, and document work.",
 	},
 	"anthropic.claude-fable-5": {
-		maxTokens: 8192,
+		maxTokens: 128_000,
 		contextWindow: 1_000_000,
 		supportsImages: true,
 		supportsPromptCache: true,
 		supportsReasoningBudget: true,
 		supportsReasoningBinary: true,
+		supportsMaxTokens: true,
 		supportsTemperature: false,
 		inputPrice: 10.0,
 		outputPrice: 50.0,
