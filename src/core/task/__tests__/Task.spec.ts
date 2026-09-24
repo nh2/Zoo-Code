@@ -3212,6 +3212,42 @@ describe("Cline", () => {
 				},
 			})
 		})
+
+		it("completePartialMessage clears partial, persists, and posts the update", async () => {
+			const task = new Task({
+				provider: mockProvider,
+				apiConfiguration: mockApiConfig,
+				task: "test task",
+				startTask: false,
+			})
+			const saveSpy = vi.spyOn(getTaskTestAccess(task), "saveClineMessages").mockResolvedValue(true)
+			const message = { ts: 1, type: "ask" as const, ask: "tool" as const, text: "{}", partial: true }
+
+			await task.completePartialMessage(message)
+
+			expect(message.partial).toBe(false)
+			expect(saveSpy).toHaveBeenCalledOnce()
+			expect(mockProvider.postMessageToWebview).toHaveBeenCalledWith({
+				type: "messageUpdated",
+				clineMessage: expect.objectContaining({ ts: 1, partial: false }),
+			})
+		})
+
+		it("completePartialMessage leaves complete or missing messages untouched", async () => {
+			const task = new Task({
+				provider: mockProvider,
+				apiConfiguration: mockApiConfig,
+				task: "test task",
+				startTask: false,
+			})
+			const saveSpy = vi.spyOn(getTaskTestAccess(task), "saveClineMessages").mockResolvedValue(true)
+
+			await task.completePartialMessage(undefined)
+			await task.completePartialMessage({ ts: 2, type: "say", say: "text", text: "done", partial: false })
+
+			expect(saveSpy).not.toHaveBeenCalled()
+			expect(mockProvider.postMessageToWebview).not.toHaveBeenCalled()
+		})
 	})
 
 	describe("abortTask", () => {
