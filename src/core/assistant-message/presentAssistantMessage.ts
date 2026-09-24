@@ -311,6 +311,7 @@ async function presentAssistantMessageBlock(cline: Task, policySnapshot: Request
 					return
 				}
 				const errorString = `Error ${action}: ${JSON.stringify(serializeError(error))}`
+				await cline.finalizePartialToolAsk()
 				await cline.say(
 					"error",
 					`Error ${action}:\n${error.message ?? JSON.stringify(serializeError(error), null, 2)}`,
@@ -736,6 +737,8 @@ async function presentAssistantMessageBlock(cline: Task, policySnapshot: Request
 				}
 				const errorString = `Error ${action}: ${JSON.stringify(serializeError(error))}`
 
+				// Tools only finalize their own streaming preview on paths they anticipate; left partial it spins forever.
+				await cline.finalizePartialToolAsk()
 				await cline.say(
 					"error",
 					`Error ${action}:\n${error.message ?? JSON.stringify(serializeError(error), null, 2)}`,
