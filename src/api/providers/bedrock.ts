@@ -162,7 +162,8 @@ export interface StreamEvent {
 		role?: string
 	}
 	messageStop?: {
-		stopReason?: "end_turn" | "tool_use" | "max_tokens" | "stop_sequence"
+		// Widened: the SDK enum also carries guardrail_intervened, content_filtered and more, and the service may add others.
+		stopReason?: string
 		additionalModelResponseFields?: Record<string, unknown>
 	}
 	contentBlockStart?: ContentBlockStartEvent
@@ -793,6 +794,12 @@ export class AwsBedrockHandler extends BaseProvider implements SingleCompletionH
 				// Handle message stop
 				if (streamEvent.messageStop) {
 					outputLimitReached = streamEvent.messageStop.stopReason === "max_tokens"
+					if (streamEvent.messageStop.stopReason) {
+						yield {
+							type: "stop_reason",
+							reason: streamEvent.messageStop.stopReason,
+						}
+					}
 					continue
 				}
 			}
