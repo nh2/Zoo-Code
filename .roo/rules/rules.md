@@ -17,7 +17,15 @@
 
     - Never disable any lint rules without explicit user approval
 
-3. Styling Guidelines:
+3. Comments:
+
+    - Prefer no comment: name things well and let the code speak for itself
+    - When a comment is warranted, a single line is almost always enough
+    - Comment on _why_, never on _what_ the code already states
+    - Do not restate the diff, narrate the change, or argue for a decision at length; that belongs in the commit message
+    - Multi-line block comments need a concrete reason, e.g. a non-obvious invariant or an external quirk a reader cannot infer
+
+4. Styling Guidelines:
 
     - Use Tailwind CSS classes instead of inline style objects for new markup
     - VSCode CSS variables must be added to webview-ui/src/index.css before using them in Tailwind classes
