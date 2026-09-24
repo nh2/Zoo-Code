@@ -16,6 +16,7 @@ describe("bedrockModels adaptive-thinking output ceilings", () => {
 
 	it.each([
 		["anthropic.claude-opus-5", ADAPTIVE_THINKING_MAX_OUTPUT_TOKENS],
+		["anthropic.claude-opus-5-5", ADAPTIVE_THINKING_MAX_OUTPUT_TOKENS],
 		["anthropic.claude-sonnet-5", ADAPTIVE_THINKING_MAX_OUTPUT_TOKENS],
 		["anthropic.claude-fable-5", ADAPTIVE_THINKING_MAX_OUTPUT_TOKENS],
 		["anthropic.claude-fable-5-1", ADAPTIVE_THINKING_MAX_OUTPUT_TOKENS],
@@ -43,6 +44,7 @@ describe("bedrockModels adaptive-thinking output ceilings", () => {
 
 	it.each([
 		["anthropic.claude-opus-5", "claude-opus-5"],
+		["anthropic.claude-opus-5-5", "claude-opus-5-5"],
 		["anthropic.claude-sonnet-5", "claude-sonnet-5"],
 		["anthropic.claude-fable-5", "claude-fable-5"],
 		["anthropic.claude-fable-5-1", "claude-fable-5-1"],
@@ -56,6 +58,7 @@ describe("bedrockModels adaptive-thinking output ceilings", () => {
 		["anthropic.claude-opus-4-7"],
 		["anthropic.claude-opus-4-8"],
 		["anthropic.claude-opus-5"],
+		["anthropic.claude-opus-5-5"],
 		["anthropic.claude-sonnet-5"],
 		["anthropic.claude-fable-5"],
 		["anthropic.claude-fable-5-1"],
@@ -83,6 +86,7 @@ describe("vertexModels adaptive-thinking output ceilings", () => {
 
 	it.each([
 		["claude-opus-5", ADAPTIVE_THINKING_MAX_OUTPUT_TOKENS],
+		["claude-opus-5-5", ADAPTIVE_THINKING_MAX_OUTPUT_TOKENS],
 		["claude-sonnet-5", ADAPTIVE_THINKING_MAX_OUTPUT_TOKENS],
 		["claude-fable-5", ADAPTIVE_THINKING_MAX_OUTPUT_TOKENS],
 		["claude-fable-5-1", ADAPTIVE_THINKING_MAX_OUTPUT_TOKENS],
@@ -107,6 +111,7 @@ describe("vertexModels adaptive-thinking output ceilings", () => {
 
 	it.each([
 		["claude-opus-5"],
+		["claude-opus-5-5"],
 		["claude-sonnet-5"],
 		["claude-fable-5"],
 		["claude-fable-5-1"],

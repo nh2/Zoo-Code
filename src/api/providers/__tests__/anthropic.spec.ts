@@ -755,7 +755,8 @@ describe("AnthropicHandler", () => {
 			expect(model.info.outputPrice).toBe(20.0)
 			expect(model.info.cacheWritesPrice).toBe(5.0)
 			expect(model.info.cacheReadsPrice).toBe(0.2)
-			expect(model.maxTokens).toBe(128000)
+			// The resolved output budget, not the registry value. See getModelMaxOutputTokens.
+			expect(model.maxTokens).toBe(128_000)
 			expect(model.info.supportsReasoningBinary).toBe(true)
 			expect(model.info.supportsReasoningBudget).toBeUndefined()
 			expect(model.info.supportsPromptCache).toBe(true)

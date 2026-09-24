@@ -504,6 +504,7 @@ export const vertexModels = {
 		cacheReadsPrice: 0.2, // $0.20 per million tokens
 		supportsReasoningBudget: true,
 		supportsReasoningBinary: true,
+		supportsMaxTokens: true,
 		supportsTemperature: false,
 		description:
 			"Claude Opus 5.5 is Anthropic's most capable model for complex agentic coding and enterprise work.",
