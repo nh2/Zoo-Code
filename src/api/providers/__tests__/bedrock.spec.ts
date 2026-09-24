@@ -958,7 +958,8 @@ describe("AwsBedrockHandler", () => {
 			expect(model.info.supportsReasoningBudget).toBe(true)
 			expect(model.info.supportsPromptCache).toBe(true)
 			expect(model.info.supportsTemperature).toBe(false)
-			expect(model.maxTokens).toBe(8192)
+			// The resolved output budget, not the registry value. See getModelMaxOutputTokens.
+			expect(model.maxTokens).toBe(128_000)
 		})
 
 		it("should apply global inference prefix for Claude Opus 5.5 when awsUseGlobalInference is true", () => {

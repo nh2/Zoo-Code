@@ -165,7 +165,7 @@ export const anthropicModels = {
 		description: "Claude Opus 5 is Anthropic's most capable model for complex agentic coding and enterprise work.",
 	},
 	"claude-opus-5-5": {
-		maxTokens: 128_000, // Overridden to 8k if `enableReasoningEffort` is false.
+		maxTokens: 128_000,
 		contextWindow: 1_000_000, // 1M context window native (no beta header required)
 		supportsImages: true,
 		supportsPromptCache: true,
