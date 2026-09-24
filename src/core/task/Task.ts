@@ -1431,6 +1431,17 @@ export class Task extends EventEmitter<TaskEvents> implements TaskLike {
 		}
 	}
 
+	/** Marks a partial message complete so the webview stops rendering it as in progress. */
+	public async completePartialMessage(message: ClineMessage | undefined): Promise<void> {
+		if (!message?.partial) {
+			return
+		}
+
+		message.partial = false
+		await this.saveClineMessages()
+		await this.updateClineMessage(message)
+	}
+
 	/** Persists Cline messages and updates task metadata in the history store. Returns false on failure. */
 	private async saveClineMessages(merge = true): Promise<boolean> {
 		try {

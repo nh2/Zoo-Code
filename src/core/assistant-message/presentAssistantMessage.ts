@@ -252,6 +252,7 @@ export async function presentAssistantMessage(cline: Task) {
 					return
 				}
 				const errorString = `Error ${action}: ${JSON.stringify(serializeError(error))}`
+				await cline.completePartialMessage(cline.clineMessages.at(-1))
 				await cline.say(
 					"error",
 					`Error ${action}:\n${error.message ?? JSON.stringify(serializeError(error), null, 2)}`,
@@ -585,6 +586,8 @@ export async function presentAssistantMessage(cline: Task) {
 				}
 				const errorString = `Error ${action}: ${JSON.stringify(serializeError(error))}`
 
+				// The failed tool's streaming preview is the last message; left partial it spins forever.
+				await cline.completePartialMessage(cline.clineMessages.at(-1))
 				await cline.say(
 					"error",
 					`Error ${action}:\n${error.message ?? JSON.stringify(serializeError(error), null, 2)}`,

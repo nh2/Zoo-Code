@@ -89,6 +89,7 @@ describe("presentAssistantMessage - Custom Tool Recording", () => {
 			getTaskMode: vi.fn().mockResolvedValue("code"),
 			say: vi.fn().mockResolvedValue(undefined),
 			ask: vi.fn().mockResolvedValue({ response: "yesButtonClicked" }),
+			completePartialMessage: vi.fn().mockResolvedValue(undefined),
 		}
 
 		// Add pushToolResultToUserContent method after mockTask is created so it can reference mockTask
@@ -203,6 +204,35 @@ describe("presentAssistantMessage - Custom Tool Recording", () => {
 			// Should record error as "custom_tool", not "failing_custom_tool"
 			expect(mockTask.recordToolError).toHaveBeenCalledWith("custom_tool", "Custom tool execution failed")
 			expect(mockTask.consecutiveMistakeCount).toBe(1)
+		})
+
+		it("completes the trailing partial message before reporting the error", async () => {
+			const partialPreview = { ts: 1, type: "ask", ask: "tool", text: "{}", partial: true }
+			mockTask.clineMessages = [partialPreview]
+			mockTask.assistantMessageContent = [
+				{
+					type: "tool_use",
+					id: "tool_call_custom_error_partial",
+					name: "failing_custom_tool",
+					params: {},
+					partial: false,
+				},
+			]
+
+			vi.mocked(customToolRegistry.has).mockReturnValue(true)
+			vi.mocked(customToolRegistry.get).mockReturnValue({
+				name: "failing_custom_tool",
+				description: "A failing custom tool",
+				execute: vi.fn().mockRejectedValue(new Error("Custom tool execution failed")),
+			})
+
+			await presentAssistantMessage(mockTask)
+
+			expect(mockTask.completePartialMessage).toHaveBeenCalledWith(partialPreview)
+			const errorSayOrder = mockTask.say.mock.invocationCallOrder[
+				mockTask.say.mock.calls.findIndex((call: unknown[]) => call[0] === "error")
+			]
+			expect(mockTask.completePartialMessage.mock.invocationCallOrder[0]).toBeLessThan(errorSayOrder)
 		})
 	})
 
