@@ -472,7 +472,7 @@ input[cmdk-input]:focus {
 }
 
 /*
- * Use geometric precision for codicons to avoid blurriness 
+ * Use geometric precision for codicons to avoid blurriness
  */
 
 .codicon[class*="codicon-"] {
@@ -507,6 +507,44 @@ input[cmdk-input]:focus {
 
 .animate-fade-in {
 	animation: fade-in 0.2s ease-out;
+}
+
+/*
+ * Three-squares spinner, a low-FPS spinner for low resource use:
+ * The squares light in turn, then two steps with none lit.
+ * `step-end` jumps between values instead of blending them,
+ * so the browser redraws only 4 times per second.
+ */
+@keyframes three-squares-spinner-blink {
+	0% {
+		opacity: 1;
+	}
+	20% {
+		opacity: 0.25;
+	}
+}
+
+.three-squares-spinner rect {
+	opacity: 0.25;
+	animation: three-squares-spinner-blink 1.25s step-end infinite;
+}
+
+.three-squares-spinner rect:nth-child(1) {
+	animation-delay: -1.25s;
+}
+
+.three-squares-spinner rect:nth-child(2) {
+	animation-delay: -1s;
+}
+
+.three-squares-spinner rect:nth-child(3) {
+	animation-delay: -0.75s;
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.three-squares-spinner rect {
+		animation: none;
+	}
 }
 
 @keyframes pulse {
