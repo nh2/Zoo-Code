@@ -1,11 +1,11 @@
 import { memo, useMemo } from "react"
-import { VSCodeProgressRing } from "@vscode/webview-ui-toolkit/react"
 import { type ToolProgressStatus } from "@roo-code/types"
 import { getLanguageFromPath } from "@src/utils/getLanguageFromPath"
 import { formatPathTooltip } from "@src/utils/formatPathTooltip"
 
 import { ToolUseBlock, ToolUseBlockHeader } from "./ToolUseBlock"
 import CodeBlock from "./CodeBlock"
+import { LowFpsSpinner } from "./LowFpsSpinner"
 import { PathTooltip } from "../ui/PathTooltip"
 import DiffView from "./DiffView"
 
@@ -53,7 +53,7 @@ const CodeAccordion = ({
 		<ToolUseBlock>
 			{hasHeader && (
 				<ToolUseBlockHeader onClick={onToggleExpand} className="group">
-					{isLoading && <VSCodeProgressRing className="size-3 mr-2" />}
+					{isLoading && <LowFpsSpinner className="size-3 mr-2" />}
 					{header ? (
 						<div className="flex items-center">
 							<span className="codicon codicon-server mr-1.5"></span>
