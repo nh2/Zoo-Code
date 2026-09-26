@@ -2031,6 +2031,56 @@ describe("Cline", () => {
 			expect(systemPromptCall[16]).toEqual(["execute_command"])
 		})
 
+		it.each([
+			[{ rawApiDumpToTaskFile: false, rawApiDumpToOutputChannel: false }, false],
+			[{ rawApiDumpToTaskFile: true, rawApiDumpToOutputChannel: false }, true],
+			[{ rawApiDumpToTaskFile: false, rawApiDumpToOutputChannel: true }, true],
+		])("passes a raw API dump to the provider only when enabled (%o)", async (dumpSettings, expectDump) => {
+			const task = new Task({
+				provider: mockProvider,
+				apiConfiguration: mockApiConfig,
+				task: "test task",
+				startTask: false,
+			})
+			await task.getTaskMode()
+
+			const realState = await mockProvider.getState()
+			vi.spyOn(mockProvider, "getState").mockResolvedValue({
+				...realState,
+				mcpEnabled: false,
+				autoApprovalEnabled: false,
+				...dumpSettings,
+			})
+			vi.spyOn(task.diffViewProvider, "reset").mockResolvedValue(undefined)
+			const createMessageSpy = vi.spyOn(task.api, "createMessage").mockReturnValue({
+				async *[Symbol.asyncIterator]() {
+					yield { type: "text", text: "ok" }
+				},
+				async next() {
+					return { done: true, value: undefined }
+				},
+				async return() {
+					return { done: true, value: undefined }
+				},
+				async throw(error: unknown) {
+					throw error
+				},
+				async [Symbol.asyncDispose]() {},
+			} as AsyncGenerator<ApiStreamChunk>)
+			vi.mocked(SYSTEM_PROMPT).mockResolvedValueOnce("mock system prompt")
+
+			await task.attemptApiRequest(0).next()
+
+			const metadata = requireDefined(createMessageSpy.mock.calls.at(-1))[2]
+			if (expectDump) {
+				expect(metadata?.rawApiDump).toEqual(
+					expect.objectContaining({ request: expect.any(Function), event: expect.any(Function) }),
+				)
+			} else {
+				expect(metadata).not.toHaveProperty("rawApiDump")
+			}
+		})
+
 		it("threads the captured state snapshot into the system prompt when manually condensing", async () => {
 			// condenseContext captures provider state once and threads it into
 			// getSystemPrompt so the prompt and the condensing tool array resolve

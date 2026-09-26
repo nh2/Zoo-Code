@@ -220,6 +220,8 @@ const SettingsView = forwardRef<SettingsViewRef, SettingsViewProps>(({ onDone, t
 		autoCloseZooOpenedFiles,
 		autoCloseZooOpenedFilesAfterUserEdited,
 		autoCloseZooOpenedNewFiles,
+		rawApiDumpToTaskFile,
+		rawApiDumpToOutputChannel,
 	} = cachedState
 
 	const apiConfiguration = useMemo(() => cachedState.apiConfiguration ?? {}, [cachedState.apiConfiguration])
@@ -449,6 +451,8 @@ const SettingsView = forwardRef<SettingsViewRef, SettingsViewProps>(({ onDone, t
 						autoCloseZooOpenedFilesAfterUserEdited ?? DEFAULT_AUTO_CLOSE_ZOO_OPENED_FILES_AFTER_USER_EDITED,
 					autoCloseZooOpenedNewFiles: autoCloseZooOpenedNewFiles ?? DEFAULT_AUTO_CLOSE_ZOO_OPENED_NEW_FILES,
 					profileThresholds,
+					rawApiDumpToTaskFile: rawApiDumpToTaskFile ?? false,
+					rawApiDumpToOutputChannel: rawApiDumpToOutputChannel ?? false,
 					imageGenerationProvider,
 					openRouterImageApiKey,
 					openRouterImageGenerationSelectedModel,
@@ -978,6 +982,9 @@ const SettingsView = forwardRef<SettingsViewRef, SettingsViewProps>(({ onDone, t
 								setTelemetrySetting={setTelemetrySetting}
 								debug={cachedState.debug}
 								setDebug={setDebug}
+								rawApiDumpToTaskFile={rawApiDumpToTaskFile}
+								rawApiDumpToOutputChannel={rawApiDumpToOutputChannel}
+								setCachedStateField={setCachedStateField}
 							/>
 						)}
 					</SearchIndexProvider>

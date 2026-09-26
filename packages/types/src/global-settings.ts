@@ -246,6 +246,16 @@ export const globalSettingsSchema = z.object({
 	execaShellPath: z.string().optional(),
 
 	diagnosticsEnabled: z.boolean().optional(),
+	/**
+	 * Append each raw provider request and stream event to `raw_api_dump.jsonl` in the task directory.
+	 * @default false
+	 */
+	rawApiDumpToTaskFile: z.boolean().optional(),
+	/**
+	 * Print each raw provider request and stream event to the "Zoo Code Raw API" output channel.
+	 * @default false
+	 */
+	rawApiDumpToOutputChannel: z.boolean().optional(),
 	autoCloseZooOpenedFiles: z.boolean().optional(),
 	autoCloseZooOpenedFilesAfterUserEdited: z.boolean().optional(),
 	autoCloseZooOpenedNewFiles: z.boolean().optional(),

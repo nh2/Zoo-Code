@@ -425,6 +425,24 @@ describe("SettingsView - Sound Settings", () => {
 		)
 	})
 
+	it("saves raw API dump destinations from cached state, defaulting to false", () => {
+		const { activateTab, getSettingsContent } = renderSettingsView()
+
+		activateTab("about")
+		fireEvent.click(within(getSettingsContent()).getByTestId("raw-api-dump-task-file-checkbox"))
+		fireEvent.click(screen.getByTestId("save-button"))
+
+		expect(vscode.postMessage).toHaveBeenCalledWith(
+			expect.objectContaining({
+				type: "updateSettings",
+				updatedSettings: expect.objectContaining({
+					rawApiDumpToTaskFile: true,
+					rawApiDumpToOutputChannel: false,
+				}),
+			}),
+		)
+	})
+
 	it("saves the selected chat font size and persists null on reset", () => {
 		const { activateTab, getSettingsContent } = renderSettingsView()
 

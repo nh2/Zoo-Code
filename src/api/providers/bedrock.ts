@@ -621,6 +621,7 @@ export class AwsBedrockHandler extends BaseProvider implements SingleCompletionH
 				10 * 60 * 1000,
 			)
 
+			metadata?.rawApiDump?.request(this.providerName, payload)
 			const command = new ConverseStreamCommand(payload)
 			const response = await this.client.send(command, {
 				abortSignal: requestController.signal,
@@ -633,6 +634,7 @@ export class AwsBedrockHandler extends BaseProvider implements SingleCompletionH
 
 			let outputLimitReached = false
 			for await (const chunk of response.stream) {
+				metadata?.rawApiDump?.event(this.providerName, chunk)
 				// Parse the chunk as JSON if it's a string (for tests)
 				let streamEvent: StreamEvent
 				try {
@@ -848,6 +850,7 @@ export class AwsBedrockHandler extends BaseProvider implements SingleCompletionH
 		} catch (error: unknown) {
 			// Clear timeout on error
 			clearTimeout(timeoutId)
+			metadata?.rawApiDump?.error(this.providerName, error)
 
 			// Capture error in telemetry before processing
 			const errorMessage = error instanceof Error ? error.message : String(error)

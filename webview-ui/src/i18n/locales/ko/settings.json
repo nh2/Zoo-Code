@@ -64,6 +64,12 @@
 			"label": "디버그 모드 활성화",
 			"description": "디버그 모드를 활성화하여 작업 헤더에 API 대화 기록과 UI 메시지를 임시 파일에 포맷된 JSON으로 볼 수 있는 추가 버튼을 표시합니다."
 		},
+		"rawApiDump": {
+			"label": "원시 API 덤프",
+			"description": "모델 제공자(Anthropic, Vertex Claude, Bedrock)와 주고받는 수정되지 않은 요청과 모든 스트림 이벤트를 기록합니다. 덤프에는 전체 프롬프트와 대화가 포함되므로 디버깅할 때만 활성화하세요.",
+			"toTaskFile": "작업 디렉터리의 raw_api_dump.jsonl에 기록",
+			"toOutputChannel": "\"Zoo Code Raw API\" 출력 패널에 출력"
+		},
 		"rooHistoryImport": {
 			"settingLabel": "Roo Code에서 기록 가져오기",
 			"cardTitle": "Roo Code 기록",

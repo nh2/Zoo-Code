@@ -10,6 +10,7 @@ import {
 } from "@roo-code/types"
 
 import { getRouterRemovalMessage } from "../core/config/routerRemoval"
+import type { RawApiDump } from "../utils/rawApiDump"
 import { ApiStream } from "./transform/stream"
 
 import {
@@ -115,6 +116,11 @@ export interface ApiHandlerCreateMessageMetadata {
 	 * when the user clicks stop, preventing wasted API tokens/compute on the provider side.
 	 */
 	abortSignal?: AbortSignal
+	/**
+	 * Debug sink for the unmodified provider request and stream events.
+	 * Only set when the user enabled raw API dumping.
+	 */
+	rawApiDump?: RawApiDump
 }
 
 export interface ApiHandler {

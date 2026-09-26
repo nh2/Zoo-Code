@@ -64,6 +64,12 @@
 			"label": "Bật chế độ debug",
 			"description": "Bật chế độ debug để hiển thị các nút bổ sung trong tiêu đề nhiệm vụ cho phép xem lịch sử hội thoại API và tin nhắn UI dưới dạng JSON được định dạng trong các tệp tạm thời."
 		},
+		"rawApiDump": {
+			"label": "Bản dump API thô",
+			"description": "Ghi lại yêu cầu chưa chỉnh sửa và mọi sự kiện stream trao đổi với nhà cung cấp mô hình (Anthropic, Vertex Claude, Bedrock). Bản dump chứa toàn bộ prompt và cuộc trò chuyện của bạn, vì vậy chỉ bật khi gỡ lỗi.",
+			"toTaskFile": "Ghi vào raw_api_dump.jsonl trong thư mục tác vụ",
+			"toOutputChannel": "In ra bảng đầu ra \"Zoo Code Raw API\""
+		},
 		"rooHistoryImport": {
 			"settingLabel": "Nhập lịch sử từ Roo Code",
 			"cardTitle": "Lịch sử Roo Code",

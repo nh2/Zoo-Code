@@ -64,6 +64,12 @@
 			"label": "启用调试模式",
 			"description": "启用调试模式以在任务标题栏显示额外按钮，用于在临时文件中查看 API 对话历史和 UI 消息的格式化 JSON。"
 		},
+		"rawApiDump": {
+			"label": "原始 API 转储",
+			"description": "记录与模型提供商（Anthropic、Vertex Claude、Bedrock）交换的未经修改的请求和每个流事件。转储包含你的完整提示词和对话，因此仅在调试时启用。",
+			"toTaskFile": "写入任务目录中的 raw_api_dump.jsonl",
+			"toOutputChannel": "输出到“Zoo Code Raw API”输出面板"
+		},
 		"rooHistoryImport": {
 			"settingLabel": "从 Roo Code 导入历史记录",
 			"cardTitle": "Roo Code 历史记录",
