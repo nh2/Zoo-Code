@@ -43,6 +43,17 @@ import { formatResponse } from "../prompts/responses"
 import { sanitizeToolUseId } from "../../utils/tool-id"
 
 /**
+ * Tool result for a call from a turn a safety classifier or guardrail ended.
+ * States the real stop reason, so the model changes course instead of retrying a "malformed" call.
+ */
+export function contentStopToolResult(toolName: string, stopReason: string): string {
+	return (
+		`The provider stopped your response (stop reason: ${stopReason}) while you were writing this ${toolName} call. ` +
+		`The call was cut off and was not run. Resending the same content is likely to be stopped again.`
+	)
+}
+
+/**
  * Maps a raw, potentially model-controlled tool name to a safe analytics key.
  * Never returns the raw name unless it is a known static tool, so an
  * arbitrary model-supplied string can never become a `toolsUsed` property key.
@@ -133,6 +144,20 @@ export async function presentAssistantMessage(cline: Task) {
 			// These are converted to the same execution path as use_mcp_tool but preserve
 			// their original name in API history
 			const mcpBlock = block as McpToolUse
+
+			if (cline.contentStopReason && !mcpBlock.partial) {
+				if (mcpBlock.id) {
+					cline.pushToolResultToUserContent({
+						type: "tool_result",
+						tool_use_id: sanitizeToolUseId(mcpBlock.id),
+						content: formatResponse.toolError(
+							contentStopToolResult(mcpBlock.name, cline.contentStopReason),
+						),
+						is_error: true,
+					})
+				}
+				break
+			}
 
 			if (cline.didRejectTool) {
 				// For native protocol, we must send a tool_result for every tool_use to avoid API errors
@@ -503,6 +528,16 @@ export async function presentAssistantMessage(cline: Task) {
 			//
 			// This avoids executing an invalid tool_use block and prevents duplicate/fragmented
 			// error reporting.
+			if (cline.contentStopReason && !block.partial) {
+				cline.pushToolResultToUserContent({
+					type: "tool_result",
+					tool_use_id: sanitizeToolUseId(toolCallId),
+					content: formatResponse.toolError(contentStopToolResult(block.name, cline.contentStopReason)),
+					is_error: true,
+				})
+				break
+			}
+
 			if (!block.partial) {
 				const customTool = stateExperiments?.customTools ? customToolRegistry.get(block.name) : undefined
 				const isKnownTool = isValidToolName(String(block.name), stateExperiments)

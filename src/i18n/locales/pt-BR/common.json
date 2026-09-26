@@ -62,6 +62,7 @@
 		"path_outside_workspace": "O caminho está fora do espaço de trabalho",
 		"settings_import_failed": "Falha ao importar configurações: {{error}}",
 		"mistake_limit_guidance": "Isso pode indicar uma falha no processo de pensamento do modelo ou incapacidade de usar uma ferramenta adequadamente, o que pode ser mitigado com orientação do usuário (ex. \"Tente dividir a tarefa em etapas menores\").",
+		"content_stop_tool_not_run": "O provedor interrompeu a resposta do modelo ({{reason}}). Qualquer chamada de ferramenta nela foi cortada e não foi executada.",
 		"violated_organization_allowlist": "Falha ao executar a tarefa: o perfil atual não é compatível com as configurações da sua organização",
 		"condense_failed": "Falha ao condensar o contexto",
 		"condense_not_enough_messages": "Não há mensagens suficientes para condensar o contexto",
