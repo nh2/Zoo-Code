@@ -64,6 +64,12 @@
 			"label": "Aktifkan mode debug",
 			"description": "Aktifkan mode debug untuk menampilkan tombol tambahan di header tugas yang memungkinkan melihat riwayat percakapan API dan pesan UI sebagai JSON yang diformat dalam file sementara."
 		},
+		"rawApiDump": {
+			"label": "Dump API mentah",
+			"description": "Rekam permintaan yang tidak diubah dan setiap event stream yang dipertukarkan dengan penyedia model (Anthropic, Vertex Claude, Bedrock). Dump berisi prompt lengkap dan percakapanmu, jadi aktifkan hanya saat debugging.",
+			"toTaskFile": "Tulis ke raw_api_dump.jsonl di direktori tugas",
+			"toOutputChannel": "Cetak ke panel output \"Zoo Code Raw API\""
+		},
 		"rooHistoryImport": {
 			"settingLabel": "Impor riwayat dari Roo Code",
 			"cardTitle": "Riwayat Roo Code",

@@ -41,7 +41,7 @@ import type { Anthropic } from "@anthropic-ai/sdk"
 import { AwsBedrockHandler, BEDROCK_STREAM_EXCEPTION_KEYS } from "../bedrock"
 import { OutputTokenLimitError } from "../utils/output-token-limit-error"
 import type { ApiStreamChunk } from "../../transform/stream"
-import { makeCreateMessageMetadata } from "../../../test-utils/api"
+import { makeCreateMessageMetadata, makeRecordingRawApiDump } from "../../../test-utils/api"
 import { clearAllMocks } from "../../../test-utils/reset"
 
 const messages: Anthropic.Messages.MessageParam[] = [{ role: "user", content: "Hello" }]
@@ -158,6 +158,61 @@ describe("AwsBedrockHandler stream diagnostics", () => {
 				{ type: "text", text: "still works" },
 				{ type: "stop_reason", reason: "end_turn" },
 			])
+		})
+	})
+
+	describe("raw API dump", () => {
+		it("records the request payload and every stream event before normalisation", async () => {
+			// An empty reasoning block and a bare signature delta both yield no chunk.
+			const events = [
+				{ contentBlockStart: { contentBlockIndex: 0, start: { reasoningContent: {} } } },
+				{ contentBlockDelta: { contentBlockIndex: 0, delta: { reasoningContent: { signature: "sig" } } } },
+				{ contentBlockDelta: { contentBlockIndex: 1, delta: { text: "hi" } } },
+				{ messageStop: { stopReason: "end_turn" } },
+			]
+			const rawApiDump = makeRecordingRawApiDump()
+			const handler = createHandler(events)
+
+			const chunks: ApiStreamChunk[] = []
+			for await (const chunk of handler.createMessage(
+				"system",
+				messages,
+				makeCreateMessageMetadata({ rawApiDump }),
+			)) {
+				chunks.push(chunk)
+			}
+
+			expect(chunks.filter((c) => c.type === "text")).toEqual([{ type: "text", text: "hi" }])
+			expect(rawApiDump.records[0]).toMatchObject({
+				provider: "Bedrock",
+				kind: "request",
+				data: expect.objectContaining({ modelId: expect.any(String), messages: expect.any(Array) }),
+			})
+			expect(rawApiDump.records.slice(1)).toEqual(
+				events.map((data) => ({ provider: "Bedrock", kind: "event", data })),
+			)
+		})
+
+		it("records stream errors", async () => {
+			const rawApiDump = makeRecordingRawApiDump()
+			const handler = createHandler([{ validationException: { message: "bad" } }])
+
+			await expect(
+				(async () => {
+					for await (const _ of handler.createMessage(
+						"system",
+						messages,
+						makeCreateMessageMetadata({ rawApiDump }),
+					)) {
+						// drain
+					}
+				})(),
+			).rejects.toThrow()
+
+			expect(rawApiDump.records.at(-1)).toMatchObject({
+				kind: "error",
+				data: expect.objectContaining({ message: expect.stringContaining("bad") }),
+			})
 		})
 	})
 })

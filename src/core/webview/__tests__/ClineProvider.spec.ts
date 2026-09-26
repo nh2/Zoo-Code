@@ -1893,6 +1893,31 @@ describe("ClineProvider", () => {
 		expect(provider.providerSettingsManager.activateProfile).toHaveBeenCalledWith({ id: "config-id-123" })
 	})
 
+	test("round-trips the raw API dump settings through getState and getStateToPostToWebview", async () => {
+		await provider.resolveWebviewView(mockWebviewView)
+		const messageHandler = vi.mocked(mockWebviewView.webview.onDidReceiveMessage).mock.calls[0][0]
+
+		expect((await provider.getState()).rawApiDumpToTaskFile).toBe(false)
+		expect((await provider.getState()).rawApiDumpToOutputChannel).toBe(false)
+		expect((await provider.getStateToPostToWebview()).rawApiDumpToTaskFile).toBe(false)
+
+		await messageHandler({
+			type: "updateSettings",
+			updatedSettings: { rawApiDumpToTaskFile: true, rawApiDumpToOutputChannel: false },
+		})
+		expect(mockContext.globalState.update).toHaveBeenCalledWith("rawApiDumpToTaskFile", true)
+		expect((await provider.getState()).rawApiDumpToTaskFile).toBe(true)
+		expect((await provider.getStateToPostToWebview()).rawApiDumpToTaskFile).toBe(true)
+		expect((await provider.getStateToPostToWebview()).rawApiDumpToOutputChannel).toBe(false)
+
+		await messageHandler({
+			type: "updateSettings",
+			updatedSettings: { rawApiDumpToTaskFile: false, rawApiDumpToOutputChannel: true },
+		})
+		expect((await provider.getStateToPostToWebview()).rawApiDumpToTaskFile).toBe(false)
+		expect((await provider.getStateToPostToWebview()).rawApiDumpToOutputChannel).toBe(true)
+	})
+
 	test("handles showRooIgnoredFiles setting", async () => {
 		await provider.resolveWebviewView(mockWebviewView)
 		const messageHandler = (mockWebviewView.webview.onDidReceiveMessage as any).mock.calls[0][0]

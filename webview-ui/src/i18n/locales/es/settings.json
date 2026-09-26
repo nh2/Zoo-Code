@@ -64,6 +64,12 @@
 			"label": "Activar modo de depuración",
 			"description": "Activa el modo de depuración para mostrar botones adicionales en el encabezado de la tarea que permitan ver el historial de conversación de la API y los mensajes de la UI como JSON formateado en archivos temporales."
 		},
+		"rawApiDump": {
+			"label": "Volcado de API sin procesar",
+			"description": "Registra la solicitud sin modificar y cada evento del stream intercambiado con el proveedor del modelo (Anthropic, Vertex Claude, Bedrock). Los volcados incluyen tus prompts completos y la conversación, así que actívalo solo mientras depuras.",
+			"toTaskFile": "Escribir en raw_api_dump.jsonl en el directorio de la tarea",
+			"toOutputChannel": "Mostrar en el panel de salida \"Zoo Code Raw API\""
+		},
 		"rooHistoryImport": {
 			"settingLabel": "Importar historial desde Roo Code",
 			"cardTitle": "Historial de Roo Code",

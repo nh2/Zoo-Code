@@ -64,6 +64,12 @@
 			"label": "Activa el mode de depuració",
 			"description": "Activa el mode de depuració per mostrar botons addicionals a la capçalera de la tasca que permetin veure l'historial de conversa de l'API i els missatges de la UI com a JSON formatejat en fitxers temporals."
 		},
+		"rawApiDump": {
+			"label": "Bolcat d'API en brut",
+			"description": "Registra la sol·licitud sense modificar i cada esdeveniment del flux intercanviat amb el proveïdor del model (Anthropic, Vertex Claude, Bedrock). Els bolcats inclouen els teus prompts complets i la conversa, així que activa-ho només mentre depures.",
+			"toTaskFile": "Escriu a raw_api_dump.jsonl al directori de la tasca",
+			"toOutputChannel": "Mostra al panell de sortida \"Zoo Code Raw API\""
+		},
 		"rooHistoryImport": {
 			"settingLabel": "Importa l'historial des de Roo Code",
 			"cardTitle": "Historial de Roo Code",

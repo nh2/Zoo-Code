@@ -304,6 +304,8 @@ export type ExtensionState = Pick<
 	| "terminalProfile"
 	| "execaShellPath"
 	| "diagnosticsEnabled"
+	| "rawApiDumpToTaskFile"
+	| "rawApiDumpToOutputChannel"
 	| "autoCloseZooOpenedFiles"
 	| "autoCloseZooOpenedFilesAfterUserEdited"
 	| "autoCloseZooOpenedNewFiles"

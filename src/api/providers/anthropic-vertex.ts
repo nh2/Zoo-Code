@@ -116,9 +116,11 @@ export class AnthropicVertexHandler extends BaseProvider implements SingleComple
 		// and prompt caching
 		const requestOptions = betas?.length ? { headers: { "anthropic-beta": betas.join(",") } } : undefined
 
+		metadata?.rawApiDump?.request("AnthropicVertex", { params, requestOptions })
 		const stream = await this.client.messages.create(params, requestOptions)
 
 		for await (const chunk of stream) {
+			metadata?.rawApiDump?.event("AnthropicVertex", chunk)
 			switch (chunk.type) {
 				case "message_start": {
 					const usage = chunk.message!.usage
