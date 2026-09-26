@@ -37,6 +37,7 @@ vi.mock("@aws-sdk/client-bedrock-runtime", () => ({
 }))
 
 import type { Anthropic } from "@anthropic-ai/sdk"
+import { ConverseStreamCommand } from "@aws-sdk/client-bedrock-runtime"
 
 import { AwsBedrockHandler, BEDROCK_STREAM_EXCEPTION_KEYS } from "../bedrock"
 import { OutputTokenLimitError } from "../utils/output-token-limit-error"
@@ -158,6 +159,72 @@ describe("AwsBedrockHandler stream diagnostics", () => {
 				{ type: "text", text: "still works" },
 				{ type: "stop_reason", reason: "end_turn" },
 			])
+		})
+
+		describe("stop_details forwarding", () => {
+			it("asks Bedrock to forward Anthropic's stop_details for Claude models", async () => {
+				const handler = createHandler([{ messageStop: { stopReason: "end_turn" } }])
+				await collect(handler)
+
+				const payload = vi.mocked(ConverseStreamCommand).mock.calls[0][0]
+				expect(payload.additionalModelResponseFieldPaths).toEqual(["/stop_details"])
+			})
+
+			it("appends the refusal category and explanation to the stop reason", async () => {
+				const chunks = await collect(
+					createHandler([
+						{
+							messageStop: {
+								stopReason: "content_filtered",
+								additionalModelResponseFields: {
+									stop_details: {
+										type: "refusal",
+										category: "reasoning_extraction",
+										explanation: "Declined to reproduce internal reasoning.",
+									},
+								},
+							},
+						},
+					]),
+				)
+
+				expect(chunks).toContainEqual({
+					type: "stop_reason",
+					reason: "content_filtered (reasoning_extraction: Declined to reproduce internal reasoning.)",
+				})
+			})
+
+			it("falls back to the stop_details type when category and explanation are null", async () => {
+				const chunks = await collect(
+					createHandler([
+						{
+							messageStop: {
+								stopReason: "content_filtered",
+								additionalModelResponseFields: {
+									stop_details: { type: "refusal", category: null, explanation: null },
+								},
+							},
+						},
+					]),
+				)
+
+				expect(chunks).toContainEqual({ type: "stop_reason", reason: "content_filtered (refusal)" })
+			})
+
+			it("keeps the bare stop reason when stop_details is null", async () => {
+				const chunks = await collect(
+					createHandler([
+						{
+							messageStop: {
+								stopReason: "end_turn",
+								additionalModelResponseFields: { stop_details: null },
+							},
+						},
+					]),
+				)
+
+				expect(chunks).toContainEqual({ type: "stop_reason", reason: "end_turn" })
+			})
 		})
 	})
 
