@@ -151,6 +151,36 @@ describe("About", () => {
 		)
 	})
 
+	it("binds the raw API dump checkboxes to props and reports each destination separately", () => {
+		const setCachedStateField = vi.fn()
+		render(
+			<TranslationProvider>
+				<About
+					{...defaultProps}
+					rawApiDumpToTaskFile={true}
+					rawApiDumpToOutputChannel={false}
+					setCachedStateField={setCachedStateField}
+				/>
+			</TranslationProvider>,
+		)
+
+		const taskFile = screen.getByTestId("raw-api-dump-task-file-checkbox")
+		const outputChannel = screen.getByTestId("raw-api-dump-output-channel-checkbox")
+		expect(taskFile).toBeChecked()
+		expect(outputChannel).not.toBeChecked()
+
+		fireEvent.click(outputChannel)
+		expect(setCachedStateField).toHaveBeenCalledWith("rawApiDumpToOutputChannel", true)
+		fireEvent.click(taskFile)
+		expect(setCachedStateField).toHaveBeenCalledWith("rawApiDumpToTaskFile", false)
+	})
+
+	it("hides the raw API dump controls when no cached-state setter is provided", () => {
+		renderAbout()
+
+		expect(screen.queryByTestId("raw-api-dump-task-file-checkbox")).not.toBeInTheDocument()
+	})
+
 	it("shows the telemetry checkbox as checked when the setting is explicitly enabled", () => {
 		render(
 			<TranslationProvider>

@@ -64,6 +64,12 @@
 			"label": "Włącz tryb debugowania",
 			"description": "Włącz tryb debugowania, aby wyświetlić dodatkowe przyciski w nagłówku zadania umożliwiające przeglądanie historii konwersacji API i komunikatów UI jako sformatowany JSON w plikach tymczasowych."
 		},
+		"rawApiDump": {
+			"label": "Surowy zrzut API",
+			"description": "Zapisuje niezmienione żądanie i każde zdarzenie strumienia wymieniane z dostawcą modelu (Anthropic, Vertex Claude, Bedrock). Zrzuty zawierają twoje pełne prompty i rozmowę, więc włączaj to tylko podczas debugowania.",
+			"toTaskFile": "Zapisuj do raw_api_dump.jsonl w katalogu zadania",
+			"toOutputChannel": "Wyświetlaj w panelu wyjściowym \"Zoo Code Raw API\""
+		},
 		"rooHistoryImport": {
 			"settingLabel": "Importuj historię z Roo Code",
 			"cardTitle": "Historia Roo Code",

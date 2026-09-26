@@ -64,6 +64,12 @@
 			"label": "Debug-Modus aktivieren",
 			"description": "Aktiviere den Debug-Modus, um zusätzliche Buttons im Task-Header zum Anzeigen der API-Konversationshistorie und UI-Nachrichten als formatiertes JSON in temporären Dateien zu erhalten."
 		},
+		"rawApiDump": {
+			"label": "Roher API-Dump",
+			"description": "Zeichnet die unveränderte Anfrage und jedes Stream-Event auf, das mit dem Modellanbieter (Anthropic, Vertex Claude, Bedrock) ausgetauscht wird. Dumps enthalten deine vollständigen Prompts und die Unterhaltung, aktiviere das also nur zum Debuggen.",
+			"toTaskFile": "In raw_api_dump.jsonl im Aufgabenverzeichnis schreiben",
+			"toOutputChannel": "Im Ausgabebereich \"Zoo Code Raw API\" ausgeben"
+		},
 		"rooHistoryImport": {
 			"settingLabel": "Verlauf aus Roo Code importieren",
 			"cardTitle": "Roo Code-Verlauf",

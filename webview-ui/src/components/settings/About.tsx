@@ -16,6 +16,7 @@ import { Button } from "@/components/ui"
 import { SectionHeader } from "./SectionHeader"
 import { Section } from "./Section"
 import { SearchableSetting } from "./SearchableSetting"
+import type { SetCachedStateField } from "./types"
 
 type RooHistoryImportProgress = NonNullable<ExtensionMessage["rooHistoryImportProgress"]>
 
@@ -24,9 +25,22 @@ type AboutProps = HTMLAttributes<HTMLDivElement> & {
 	setTelemetrySetting: (setting: TelemetrySetting) => void
 	debug?: boolean
 	setDebug?: (debug: boolean) => void
+	rawApiDumpToTaskFile?: boolean
+	rawApiDumpToOutputChannel?: boolean
+	setCachedStateField?: SetCachedStateField<"rawApiDumpToTaskFile" | "rawApiDumpToOutputChannel">
 }
 
-export const About = ({ telemetrySetting, setTelemetrySetting, debug, setDebug, className, ...props }: AboutProps) => {
+export const About = ({
+	telemetrySetting,
+	setTelemetrySetting,
+	debug,
+	setDebug,
+	rawApiDumpToTaskFile,
+	rawApiDumpToOutputChannel,
+	setCachedStateField,
+	className,
+	...props
+}: AboutProps) => {
 	const { t } = useAppTranslation()
 	const [rooHistoryImportProgress, setRooHistoryImportProgress] = useState<RooHistoryImportProgress | null>(null)
 
@@ -185,6 +199,33 @@ export const About = ({ telemetrySetting, setTelemetrySetting, debug, setDebug, 
 							<p className="text-vscode-descriptionForeground text-sm mt-0">
 								{t("settings:about.debugMode.description")}
 							</p>
+						</SearchableSetting>
+					)}
+					{setCachedStateField && (
+						<SearchableSetting
+							settingId="about-raw-api-dump"
+							section="about"
+							label={t("settings:about.rawApiDump.label")}>
+							<div className="font-medium">{t("settings:about.rawApiDump.label")}</div>
+							<p className="text-vscode-descriptionForeground text-sm mt-0">
+								{t("settings:about.rawApiDump.description")}
+							</p>
+							<VSCodeCheckbox
+								checked={rawApiDumpToTaskFile ?? false}
+								onChange={(e: any) =>
+									setCachedStateField("rawApiDumpToTaskFile", e.target.checked === true)
+								}
+								data-testid="raw-api-dump-task-file-checkbox">
+								{t("settings:about.rawApiDump.toTaskFile")}
+							</VSCodeCheckbox>
+							<VSCodeCheckbox
+								checked={rawApiDumpToOutputChannel ?? false}
+								onChange={(e: any) =>
+									setCachedStateField("rawApiDumpToOutputChannel", e.target.checked === true)
+								}
+								data-testid="raw-api-dump-output-channel-checkbox">
+								{t("settings:about.rawApiDump.toOutputChannel")}
+							</VSCodeCheckbox>
 						</SearchableSetting>
 					)}
 				</div>

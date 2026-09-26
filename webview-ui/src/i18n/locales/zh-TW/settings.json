@@ -64,6 +64,12 @@
 			"label": "啟用偵錯模式",
 			"description": "啟用偵錯模式以在工作標題顯示額外按鈕，用於在暫存檔案中檢視 API 對話歷史記錄和 UI 訊息的格式化 JSON。"
 		},
+		"rawApiDump": {
+			"label": "原始 API 傾印",
+			"description": "記錄與模型供應商（Anthropic、Vertex Claude、Bedrock）交換的未經修改的請求及每個串流事件。傾印包含你的完整提示詞與對話，因此僅在偵錯時啟用。",
+			"toTaskFile": "寫入工作目錄中的 raw_api_dump.jsonl",
+			"toOutputChannel": "輸出到「Zoo Code Raw API」輸出面板"
+		},
 		"rooHistoryImport": {
 			"settingLabel": "從 Roo Code 匯入歷史記錄",
 			"cardTitle": "Roo Code 歷史記錄",

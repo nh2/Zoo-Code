@@ -64,6 +64,12 @@
 			"label": "デバッグモードを有効にする",
 			"description": "デバッグモードを有効にすると、タスクヘッダーにAPI会話履歴とUIメッセージをフォーマットされたJSONとして一時ファイルで表示するための追加ボタンが表示されます。"
 		},
+		"rawApiDump": {
+			"label": "生のAPIダンプ",
+			"description": "モデルプロバイダー（Anthropic、Vertex Claude、Bedrock）とやり取りする未加工のリクエストと、すべてのストリームイベントを記録します。ダンプにはプロンプトと会話の全文が含まれるため、デバッグ時のみ有効にしてください。",
+			"toTaskFile": "タスクディレクトリの raw_api_dump.jsonl に書き込む",
+			"toOutputChannel": "「Zoo Code Raw API」出力パネルに表示する"
+		},
 		"rooHistoryImport": {
 			"settingLabel": "Roo Code から履歴をインポート",
 			"cardTitle": "Roo Code の履歴",

@@ -64,6 +64,12 @@
 			"label": "Debugmodus inschakelen",
 			"description": "Schakel de debugmodus in om extra knoppen in de taakkoptekst te tonen voor het bekijken van API-gesprekgeschiedenis en UI-berichten als opgemaakte JSON in tijdelijke bestanden."
 		},
+		"rawApiDump": {
+			"label": "Ruwe API-dump",
+			"description": "Legt het ongewijzigde verzoek en elk stream-event vast dat met de modelprovider (Anthropic, Vertex Claude, Bedrock) wordt uitgewisseld. Dumps bevatten je volledige prompts en gesprek, dus schakel dit alleen in tijdens het debuggen.",
+			"toTaskFile": "Schrijven naar raw_api_dump.jsonl in de taakmap",
+			"toOutputChannel": "Weergeven in het uitvoerpaneel \"Zoo Code Raw API\""
+		},
 		"rooHistoryImport": {
 			"settingLabel": "Geschiedenis importeren van Roo Code",
 			"cardTitle": "Roo Code-geschiedenis",

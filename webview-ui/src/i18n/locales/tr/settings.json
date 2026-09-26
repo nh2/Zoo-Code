@@ -64,6 +64,12 @@
 			"label": "Debug modunu etkinleştir",
 			"description": "Görev başlığında API konuşma geçmişini ve UI mesajlarını geçici dosyalarda biçimlendirilmiş JSON olarak görüntülemek için ek düğmeler göstermek üzere debug modunu etkinleştirin."
 		},
+		"rawApiDump": {
+			"label": "Ham API dökümü",
+			"description": "Model sağlayıcısıyla (Anthropic, Vertex Claude, Bedrock) paylaşılan değiştirilmemiş isteği ve her akış olayını kaydeder. Dökümler tüm prompt'larını ve konuşmanı içerir, bu yüzden bunu yalnızca hata ayıklarken etkinleştir.",
+			"toTaskFile": "Görev dizinindeki raw_api_dump.jsonl dosyasına yaz",
+			"toOutputChannel": "\"Zoo Code Raw API\" çıktı paneline yazdır"
+		},
 		"rooHistoryImport": {
 			"settingLabel": "Roo Code'dan geçmişi içe aktar",
 			"cardTitle": "Roo Code geçmişi",

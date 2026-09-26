@@ -2,6 +2,23 @@ import { expect, vi, type Mock } from "vitest"
 
 import type { ApiHandlerCreateMessageMetadata } from "../api"
 import type { ApiHandlerOptions } from "../shared/api"
+import type { RawApiDump, RawApiDumpKind } from "../utils/rawApiDump"
+
+export type RecordedRawApiDump = RawApiDump & {
+	records: Array<{ provider: string; kind: RawApiDumpKind; data: unknown }>
+}
+
+/** In-memory `RawApiDump` for asserting what a provider hands to the debug sink. */
+export function makeRecordingRawApiDump(): RecordedRawApiDump {
+	const records: RecordedRawApiDump["records"] = []
+	return {
+		records,
+		request: (provider, data) => records.push({ provider, kind: "request", data }),
+		event: (provider, data) => records.push({ provider, kind: "event", data }),
+		error: (provider, data) => records.push({ provider, kind: "error", data }),
+		flush: async () => {},
+	}
+}
 
 export function makeApiHandlerOptions(overrides: Partial<ApiHandlerOptions> = {}): ApiHandlerOptions {
 	return {

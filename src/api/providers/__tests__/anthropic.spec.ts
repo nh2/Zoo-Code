@@ -4,7 +4,7 @@ import { AnthropicHandler } from "../anthropic"
 import { MAX_TIMEOUT_MS } from "../utils/abort-signal"
 import { ApiHandlerOptions } from "../../../shared/api"
 import { asyncStreamFrom, collectStream } from "../../../test-utils/stream"
-import { makeCreateMessageMetadata } from "../../../test-utils/api"
+import { makeCreateMessageMetadata, makeRecordingRawApiDump } from "../../../test-utils/api"
 import type { ApiStreamChunk } from "../../../api/transform/stream"
 import { clearAllMocks } from "../../../test-utils/reset"
 
@@ -1894,6 +1894,28 @@ describe("AnthropicHandler", () => {
 					tool_choice: { type: "auto", disable_parallel_tool_use: false },
 				}),
 				expect.anything(),
+			)
+		})
+
+		it("hands the request and every raw stream event, including empty thinking blocks, to the raw API dump", async () => {
+			const events = [
+				{ type: "message_start", message: { usage: { input_tokens: 1, output_tokens: 0 } } },
+				{ type: "content_block_start", index: 0, content_block: { type: "thinking", thinking: "" } },
+				{ type: "content_block_delta", index: 0, delta: { type: "signature_delta", signature: "sig" } },
+				{ type: "content_block_stop", index: 0 },
+			]
+			mockCreate.mockImplementationOnce(async () => asyncStreamFrom(events))
+			const rawApiDump = makeRecordingRawApiDump()
+
+			await collectStream(handler.createMessage(systemPrompt, messages, { taskId: "test-task", rawApiDump }))
+
+			expect(rawApiDump.records[0]).toMatchObject({
+				provider: "Anthropic",
+				kind: "request",
+				data: { params: expect.objectContaining({ model: mockOptions.apiModelId, stream: true }) },
+			})
+			expect(rawApiDump.records.slice(1)).toEqual(
+				events.map((data) => ({ provider: "Anthropic", kind: "event", data })),
 			)
 		})
 
