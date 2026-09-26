@@ -102,6 +102,7 @@ import { getWorkspacePath } from "../../utils/path"
 import { sanitizeToolUseId } from "../../utils/tool-id"
 import { getTaskDirectoryPath } from "../../utils/storage"
 import { createRawApiDump } from "../../utils/rawApiDump"
+import { findContentStopReason } from "./contentStop"
 import { logger } from "../../utils/logging"
 
 // prompts
@@ -614,6 +615,8 @@ export class Task extends EventEmitter<TaskEvents> implements TaskLike {
 	didRejectTool = false
 	didAlreadyUseTool = false
 	didToolFailInCurrentTurn = false
+	/** Stop reason of a turn ended by a safety classifier or guardrail; its tool calls must not run. */
+	contentStopReason: string | undefined = undefined
 	didCompleteReadingStream = false
 	private _started = false
 	private _runPromise: Promise<void> | undefined
@@ -3982,6 +3985,7 @@ export class Task extends EventEmitter<TaskEvents> implements TaskLike {
 				this.userMessageContentReady = false
 				this.didRejectTool = false
 				this.didAlreadyUseTool = false
+				this.contentStopReason = undefined
 				this.assistantMessageSavedToHistory = false
 				this.didFinishAbortingStream = false
 				this.resetAssistantMessagePersistence()
@@ -4559,6 +4563,15 @@ export class Task extends EventEmitter<TaskEvents> implements TaskLike {
 				// the case, `presentAssistantMessage` relies on these blocks either
 				// to be completed or the user to reject a block in order to proceed
 				// and eventually set userMessageContentReady to true.)
+
+				// Set before finalizing, so the tool calls presented below see it and are not run.
+				this.contentStopReason = findContentStopReason(this.streamDiagnostics.stopReasons)
+				if (this.contentStopReason) {
+					await this.say(
+						"error",
+						t("common:errors.content_stop_tool_not_run", { reason: this.contentStopReason }),
+					)
+				}
 
 				// Finalize any remaining streaming tool calls that weren't explicitly ended
 				// This is critical for MCP tools which need tool_call_end events to be properly

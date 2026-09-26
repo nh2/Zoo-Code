@@ -58,6 +58,7 @@
 		"path_outside_workspace": "路徑位於工作區之外",
 		"settings_import_failed": "設定匯入失敗：{{error}}。",
 		"mistake_limit_guidance": "這可能表明模型思維過程失敗或無法正確使用工具，可透過使用者指導來緩解（例如「嘗試將工作分解為更小的步驟」）。",
+		"content_stop_tool_not_run": "供應商停止了模型的回應（{{reason}}）。其中的工具呼叫已被截斷，未執行。",
 		"violated_organization_allowlist": "執行工作失敗：目前設定檔與您的組織設定不相容",
 		"condense_failed": "壓縮上下文失敗",
 		"condense_not_enough_messages": "沒有足夠的訊息來壓縮上下文",
