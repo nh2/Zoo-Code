@@ -67,6 +67,33 @@ interface BedrockInferenceConfig {
 }
 
 /**
+ * Asks Bedrock to forward Anthropic's `stop_details`, which names the classifier category behind a refusal
+ * (for example `reasoning_extraction`). Bedrock reports such refusals only as `content_filtered` otherwise.
+ * A valid pointer the model doesn't return is ignored by Converse. See #1820.
+ *
+ * Not yet effective: as of 2026-09-26, Opus 5.5 on Bedrock accepted this request field but returned
+ * `content_filtered` turns without `additionalModelResponseFields`, so no category was available.
+ * Kept because it is harmless and starts working if Bedrock begins forwarding the field.
+ *
+ * - https://platform.claude.com/docs/en/build-with-claude/refusals-and-fallback#what-a-refusal-looks-like
+ * - https://docs.aws.amazon.com/bedrock/latest/APIReference/API_runtime_ConverseStream.html#bedrock-runtime_ConverseStream-request-additionalModelResponseFieldPaths
+ */
+const ANTHROPIC_RESPONSE_FIELD_PATHS = ["/stop_details"]
+
+/** Renders forwarded `stop_details` as `category: explanation`; the explanation text is unstable, so it's shown, not parsed. */
+export function formatStopDetails(fields: Record<string, unknown> | undefined): string | undefined {
+	const details = fields?.stop_details
+	if (!details || typeof details !== "object") {
+		return undefined
+	}
+	const { type, category, explanation } = details as Record<string, unknown>
+	const parts = [category ?? type, explanation].filter(
+		(part): part is string => typeof part === "string" && part.length > 0,
+	)
+	return parts.length > 0 ? parts.join(": ") : undefined
+}
+
+/**
  * Models that write short user-facing progress updates between tool calls
  * ("what I found, what I'm doing next") as separate `thinking` blocks rather than `text` blocks.
  *
@@ -117,6 +144,7 @@ interface BedrockPayload {
 	inferenceConfig: BedrockInferenceConfig
 	anthropic_version?: string
 	additionalModelRequestFields?: BedrockAdditionalModelFields
+	additionalModelResponseFieldPaths?: string[]
 	toolConfig?: ToolConfiguration
 }
 
@@ -620,6 +648,9 @@ export class AwsBedrockHandler extends BaseProvider implements SingleCompletionH
 			system: formatted.system,
 			inferenceConfig,
 			...(additionalModelRequestFields && { additionalModelRequestFields }),
+			...(baseModelId.includes("claude") && {
+				additionalModelResponseFieldPaths: ANTHROPIC_RESPONSE_FIELD_PATHS,
+			}),
 			// Add anthropic_version at top level when using thinking features
 			...(thinkingEnabled && { anthropic_version: "bedrock-2023-05-31" }),
 			toolConfig,
@@ -872,9 +903,12 @@ export class AwsBedrockHandler extends BaseProvider implements SingleCompletionH
 				if (streamEvent.messageStop) {
 					outputLimitReached = streamEvent.messageStop.stopReason === "max_tokens"
 					if (streamEvent.messageStop.stopReason) {
+						const details = formatStopDetails(streamEvent.messageStop.additionalModelResponseFields)
 						yield {
 							type: "stop_reason",
-							reason: streamEvent.messageStop.stopReason,
+							reason: details
+								? `${streamEvent.messageStop.stopReason} (${details})`
+								: streamEvent.messageStop.stopReason,
 						}
 					}
 					continue
