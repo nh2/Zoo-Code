@@ -68,6 +68,26 @@ interface BedrockInferenceConfig {
 	temperature?: number
 }
 
+/**
+ * Models that write short user-facing progress updates between tool calls
+ * ("what I found, what I'm doing next") as separate `thinking` blocks rather than `text` blocks.
+ *
+ * At the default `thinking.display` ("omitted" on these models), those blocks come back with an
+ * empty `thinking` field, so explanations the user asks for before a tool call never reach the UI.
+ * `display: "updates"` (beta) returns the progress-update text while reasoning stays hidden.
+ * See #1820.
+ *
+ * - https://platform.claude.com/docs/en/build-with-claude/thinking#progress-updates
+ * - https://platform.claude.com/docs/en/models/opus-5-5/migration-guide#text-between-tool-calls
+ * - https://platform.claude.com/docs/en/build-with-claude/prompt-engineering/prompting-claude-opus-5-5#user-facing-progress-updates
+ */
+const PROGRESS_UPDATE_MODEL_PATTERNS = [
+	"opus-5-5", // Claude Opus 5.5
+	"fable-5", // Claude Fable 5 and 5.1
+	"mythos-5-1", // Claude Mythos 5.1
+] as const
+const THINKING_DISPLAY_UPDATES_BETA = "thinking-display-updates-2026-08-18"
+
 // Define interface for Bedrock additional model request fields
 // This includes thinking configuration, 1M context beta, and other model-specific parameters
 interface BedrockAdditionalModelFields {
@@ -79,8 +99,8 @@ interface BedrockAdditionalModelFields {
 		| {
 				// Claude 4.7+ adaptive thinking — no budget_tokens, uses output_config.effort instead
 				type: "adaptive"
-				// "summarized" shows thinking content in UI; omit to keep thinking internal only
-				display?: "summarized" | "none"
+				// "updates" returns only progress-update text, "summarized" also reasoning summaries.
+				display?: "summarized" | "updates" | "omitted"
 		  }
 		| { type: "disabled" }
 	output_config?: {
@@ -364,6 +384,11 @@ export class AwsBedrockHandler extends BaseProvider implements SingleCompletionH
 	 * Accepts a model ID (with or without a cross-region/global prefix) and strips
 	 * the prefix via parseBaseModelId before matching.
 	 */
+	private writesProgressUpdates(modelId: string): boolean {
+		const baseModelId = this.parseBaseModelId(modelId)
+		return PROGRESS_UPDATE_MODEL_PATTERNS.some((pattern) => baseModelId.includes(pattern))
+	}
+
 	private isAdaptiveThinkingModel(modelId: string): boolean {
 		const baseModelId = this.getCapabilityModelId(modelId)
 		return (
@@ -517,6 +542,17 @@ export class AwsBedrockHandler extends BaseProvider implements SingleCompletionH
 			// Omitting thinking enables it by default on these models. Adaptive-only
 			// models (Fable 5/5.1, Opus 5.5) reject "disabled", so they keep the omit behavior.
 			additionalModelRequestFields = { thinking: { type: "disabled" } }
+		} else if (this.writesProgressUpdates(modelConfig.id)) {
+			// Omitting `thinking` doesn't turn thinking off on these models (they reject "disabled"),
+			// it only leaves the default display, which empties the progress updates.
+			// See PROGRESS_UPDATE_MODEL_PATTERNS.
+			additionalModelRequestFields = { thinking: { type: "adaptive", display: "updates" } }
+			logger.info("Requesting progress-update text for Bedrock request with reasoning off", {
+				ctx: "bedrock",
+				modelId: modelConfig.id,
+				thinking: additionalModelRequestFields.thinking,
+				beta: THINKING_DISPLAY_UPDATES_BETA,
+			})
 		}
 
 		const inferenceConfig: BedrockInferenceConfig = {
@@ -557,6 +593,11 @@ export class AwsBedrockHandler extends BaseProvider implements SingleCompletionH
 		// This enables proper tool use streaming for Anthropic models on Bedrock
 		if (baseModelId.includes("claude")) {
 			anthropicBetas.push("fine-grained-tool-streaming-2025-05-14")
+		}
+
+		const thinkingDisplay = additionalModelRequestFields?.thinking
+		if (thinkingDisplay?.type === "adaptive" && thinkingDisplay.display === "updates") {
+			anthropicBetas.push(THINKING_DISPLAY_UPDATES_BETA)
 		}
 
 		// Apply anthropic_beta to additionalModelRequestFields if any betas are needed

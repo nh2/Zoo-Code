@@ -1849,8 +1849,8 @@ describe("AwsBedrockHandler", () => {
 			"anthropic.claude-fable-5-1",
 			"anthropic.claude-opus-5-5",
 			"global.anthropic.claude-opus-5-5",
-		])("omits thinking for adaptive-only %s when reasoning is disabled", async (apiModelId) => {
-			// These models reject thinking.type "disabled" with a 400.
+		])("requests progress-update text for adaptive-only %s when reasoning is disabled", async (apiModelId) => {
+			// These models reject thinking.type "disabled" and think anyway; the default display leaves progress updates empty.
 			const provider = new AwsBedrockHandler({
 				apiModelId,
 				enableReasoningEffort: false,
@@ -1859,9 +1859,28 @@ describe("AwsBedrockHandler", () => {
 			await collectStream(provider.createMessage("System prompt", messages))
 
 			const commandArg = mockConverseStreamCommand.mock.calls[0][0]
-			expect(commandArg.additionalModelRequestFields ?? {}).not.toHaveProperty("thinking")
+			const additionalFields = commandArg.additionalModelRequestFields as
+				| { thinking?: unknown; anthropic_beta?: string[] }
+				| undefined
+			expect(additionalFields?.thinking).toEqual({ type: "adaptive", display: "updates" })
+			expect(additionalFields?.anthropic_beta).toContain("thinking-display-updates-2026-08-18")
+			expect(additionalFields).not.toHaveProperty("output_config")
 			expect(commandArg.inferenceConfig?.temperature).toBeUndefined()
 		})
+
+		it.each(["anthropic.claude-sonnet-5", "anthropic.claude-opus-5", "anthropic.claude-opus-4-8"])(
+			"does not request the updates display beta for %s",
+			async (apiModelId) => {
+				const provider = new AwsBedrockHandler({ apiModelId, enableReasoningEffort: false })
+				await collectStream(provider.createMessage("System prompt", messages))
+
+				const commandArg = mockConverseStreamCommand.mock.calls[0][0]
+				const additionalFields = commandArg.additionalModelRequestFields as
+					| { anthropic_beta?: string[] }
+					| undefined
+				expect(additionalFields?.anthropic_beta ?? []).not.toContain("thinking-display-updates-2026-08-18")
+			},
+		)
 
 		// Unlike the getModel() tests above, these pin the budget that reaches the wire.
 		it("should send the model's full output ceiling for Claude Opus 5 with reasoning disabled", async () => {
