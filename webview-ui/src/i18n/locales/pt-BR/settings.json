@@ -64,6 +64,12 @@
 			"label": "Ativar modo de debug",
 			"description": "Ative o modo de depuração para mostrar botões adicionais no cabeçalho da tarefa para visualizar o histórico de conversação da API e as mensagens da UI como JSON formatado em arquivos temporários."
 		},
+		"rawApiDump": {
+			"label": "Dump bruto da API",
+			"description": "Registra a requisição sem modificações e cada evento do stream trocado com o provedor do modelo (Anthropic, Vertex Claude, Bedrock). Os dumps incluem seus prompts completos e a conversa, então ative apenas durante a depuração.",
+			"toTaskFile": "Gravar em raw_api_dump.jsonl no diretório da tarefa",
+			"toOutputChannel": "Exibir no painel de saída \"Zoo Code Raw API\""
+		},
 		"rooHistoryImport": {
 			"settingLabel": "Importar histórico do Roo Code",
 			"cardTitle": "Histórico do Roo Code",

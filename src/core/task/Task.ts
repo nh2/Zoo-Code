@@ -94,6 +94,7 @@ import { calculateApiCostAnthropic, calculateApiCostOpenAI } from "../../shared/
 import { getWorkspacePath } from "../../utils/path"
 import { sanitizeToolUseId } from "../../utils/tool-id"
 import { getTaskDirectoryPath } from "../../utils/storage"
+import { createRawApiDump } from "../../utils/rawApiDump"
 import { logger } from "../../utils/logging"
 
 // prompts
@@ -5142,11 +5143,19 @@ export class Task extends EventEmitter<TaskEvents> implements TaskLike {
 		this.currentRequestAbortController = new AbortController()
 		const abortSignal = this.currentRequestAbortController.signal
 
+		const rawApiDump = createRawApiDump({
+			taskId: this.taskId,
+			globalStoragePath: this.globalStoragePath,
+			toTaskFile: state?.rawApiDumpToTaskFile ?? false,
+			toOutputChannel: state?.rawApiDumpToOutputChannel ?? false,
+		})
+
 		const metadata: ApiHandlerCreateMessageMetadata = {
 			mode: mode,
 			taskId: this.taskId,
 			suppressPreviousResponseId: this.skipPrevResponseIdOnce,
 			abortSignal,
+			...(rawApiDump ? { rawApiDump } : {}),
 			// Include tools whenever they are present.
 			...(shouldIncludeTools
 				? {

@@ -179,43 +179,46 @@ export class AnthropicHandler extends BaseProvider implements SingleCompletionHa
 						stream: true,
 						...nativeToolParams,
 					}
+					const requestOptions = (() => {
+						// prompt caching: https://x.com/alexalbert__/status/1823751995901272068
+						// https://github.com/anthropics/anthropic-sdk-typescript?tab=readme-ov-file#default-headers
+						// https://github.com/anthropics/anthropic-sdk-typescript/commit/c920b77fc67bd839bfeb6716ceab9d7c9bbe7393
+
+						// Then check for models that support prompt caching
+						switch (modelId) {
+							case "claude-sonnet-5":
+							case "claude-sonnet-4-6":
+							case "claude-sonnet-4-5":
+							case "claude-sonnet-4-20250514":
+							case "claude-opus-4-6":
+							case "claude-opus-4-7":
+							case "claude-opus-4-8":
+							case "claude-opus-5":
+							case "claude-opus-5-5":
+							case "claude-fable-5-1":
+							case "claude-fable-5":
+							case "claude-opus-4-5-20251101":
+							case "claude-opus-4-1-20250805":
+							case "claude-opus-4-20250514":
+							case "claude-3-7-sonnet-20250219":
+							case "claude-3-5-sonnet-20241022":
+							case "claude-3-5-haiku-20241022":
+							case "claude-3-opus-20240229":
+							case "claude-haiku-4-5-20251001":
+							case "claude-3-haiku-20240307":
+								betas.push("prompt-caching-2024-07-31")
+								return { headers: { "anthropic-beta": betas.join(",") } }
+							default:
+								return undefined
+						}
+					})()
+					metadata?.rawApiDump?.request(this.providerName, { params: requestParams, requestOptions })
 					stream = await this.client.messages.create(
 						requestParams as Anthropic.Messages.MessageCreateParamsStreaming,
-						(() => {
-							// prompt caching: https://x.com/alexalbert__/status/1823751995901272068
-							// https://github.com/anthropics/anthropic-sdk-typescript?tab=readme-ov-file#default-headers
-							// https://github.com/anthropics/anthropic-sdk-typescript/commit/c920b77fc67bd839bfeb6716ceab9d7c9bbe7393
-
-							// Then check for models that support prompt caching
-							switch (modelId) {
-								case "claude-sonnet-5":
-								case "claude-sonnet-4-6":
-								case "claude-sonnet-4-5":
-								case "claude-sonnet-4-20250514":
-								case "claude-opus-4-6":
-								case "claude-opus-4-7":
-								case "claude-opus-4-8":
-								case "claude-opus-5":
-								case "claude-opus-5-5":
-								case "claude-fable-5-1":
-								case "claude-fable-5":
-								case "claude-opus-4-5-20251101":
-								case "claude-opus-4-1-20250805":
-								case "claude-opus-4-20250514":
-								case "claude-3-7-sonnet-20250219":
-								case "claude-3-5-sonnet-20241022":
-								case "claude-3-5-haiku-20241022":
-								case "claude-3-opus-20240229":
-								case "claude-haiku-4-5-20251001":
-								case "claude-3-haiku-20240307":
-									betas.push("prompt-caching-2024-07-31")
-									return { headers: { "anthropic-beta": betas.join(",") } }
-								default:
-									return undefined
-							}
-						})(),
+						requestOptions,
 					)
 				} catch (error) {
+					metadata?.rawApiDump?.error(this.providerName, error)
 					TelemetryService.instance.captureException(
 						new ApiProviderError(
 							error instanceof Error ? error.message : String(error),
@@ -240,10 +243,12 @@ export class AnthropicHandler extends BaseProvider implements SingleCompletionHa
 						stream: true,
 						...nativeToolParams,
 					}
+					metadata?.rawApiDump?.request(this.providerName, { params: requestParams })
 					stream = (await this.client.messages.create(
 						requestParams as Anthropic.Messages.MessageCreateParamsStreaming,
 					)) as any
 				} catch (error) {
+					metadata?.rawApiDump?.error(this.providerName, error)
 					TelemetryService.instance.captureException(
 						new ApiProviderError(
 							error instanceof Error ? error.message : String(error),
@@ -264,6 +269,7 @@ export class AnthropicHandler extends BaseProvider implements SingleCompletionHa
 		let cacheReadTokens = 0
 
 		for await (const chunk of stream) {
+			metadata?.rawApiDump?.event(this.providerName, chunk)
 			switch (chunk.type) {
 				case "message_start": {
 					// Tells us cache reads/writes/input/output.

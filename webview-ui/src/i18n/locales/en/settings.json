@@ -64,6 +64,12 @@
 			"label": "Enable debug mode",
 			"description": "Enable debug mode to show additional buttons in the task header for viewing API conversation history and UI messages as prettified JSON in temporary files."
 		},
+		"rawApiDump": {
+			"label": "Raw API dump",
+			"description": "Record the unmodified request and every stream event exchanged with the model provider (Anthropic, Vertex Claude, Bedrock). Dumps include your full prompts and conversation, so only enable this while debugging.",
+			"toTaskFile": "Write to raw_api_dump.jsonl in the task directory",
+			"toOutputChannel": "Print to the \"Zoo Code Raw API\" output panel"
+		},
 		"rooHistoryImport": {
 			"settingLabel": "Import history from Roo Code",
 			"cardTitle": "Roo Code history",
