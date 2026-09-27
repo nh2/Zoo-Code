@@ -1856,10 +1856,148 @@ describe("AwsBedrockHandler", () => {
 			const additionalFields = commandArg.additionalModelRequestFields as
 				| { thinking?: unknown; anthropic_beta?: string[] }
 				| undefined
-			expect(additionalFields?.thinking).toEqual({ type: "adaptive", display: "updates" })
+			expect(additionalFields?.thinking).toEqual({
+				type: "adaptive",
+				display: "updates",
+				block_binding: { prefix_mismatch_behavior: "drop_block" },
+			})
 			expect(additionalFields?.anthropic_beta).toContain("thinking-display-updates-2026-08-18")
+			expect(additionalFields?.anthropic_beta).toContain("thinking-binding-controls-2026-08-01")
 			expect(additionalFields).not.toHaveProperty("output_config")
 			expect(commandArg.inferenceConfig?.temperature).toBeUndefined()
+		})
+
+		it.each(["global.anthropic.claude-opus-5-5", "anthropic.claude-fable-5", "anthropic.claude-fable-5-1"])(
+			"sends drop_block with its beta when reasoning is enabled on %s",
+			async (apiModelId) => {
+				const provider = new AwsBedrockHandler({
+					apiModelId,
+					enableReasoningEffort: true,
+					modelMaxTokens: 32_000,
+				})
+				await collectStream(provider.createMessage("System prompt", messages))
+
+				const additionalFields = mockConverseStreamCommand.mock.calls[0][0].additionalModelRequestFields as
+					| { thinking?: unknown; anthropic_beta?: string[] }
+					| undefined
+				expect(additionalFields?.thinking).toMatchObject({
+					display: "summarized",
+					block_binding: { prefix_mismatch_behavior: "drop_block" },
+				})
+				expect(additionalFields?.anthropic_beta).toContain("thinking-binding-controls-2026-08-01")
+			},
+		)
+
+		it.each(["anthropic.claude-opus-4-8", "anthropic.claude-opus-5"])(
+			"leaves block_binding out for %s, which does not bind thinking to the prefix",
+			async (apiModelId) => {
+				const provider = new AwsBedrockHandler({
+					apiModelId,
+					enableReasoningEffort: true,
+					modelMaxTokens: 32_000,
+				})
+				await collectStream(provider.createMessage("System prompt", messages))
+
+				const additionalFields = mockConverseStreamCommand.mock.calls[0][0].additionalModelRequestFields as
+					| { thinking?: unknown; anthropic_beta?: string[] }
+					| undefined
+				expect(additionalFields?.thinking).not.toHaveProperty("block_binding")
+				expect(additionalFields?.anthropic_beta ?? []).not.toContain("thinking-binding-controls-2026-08-01")
+			},
+		)
+
+		it("emits each reasoning block whole at contentBlockStop, with its signature", async () => {
+			const provider = new AwsBedrockHandler({
+				apiModelId: "global.anthropic.claude-opus-5-5",
+				enableReasoningEffort: true,
+				modelMaxTokens: 32_000,
+			})
+			provider["client"].send = vi.fn().mockResolvedValue({
+				stream: asyncStreamFrom([
+					{ contentBlockDelta: { contentBlockIndex: 0, delta: { reasoningContent: { text: "Let me " } } } },
+					{ contentBlockDelta: { contentBlockIndex: 0, delta: { reasoningContent: { text: "check." } } } },
+					{
+						contentBlockDelta: {
+							contentBlockIndex: 0,
+							delta: { reasoningContent: { signature: "sig-a" } },
+						},
+					},
+					{ contentBlockStop: { contentBlockIndex: 0 } },
+					// An omitted block: no text, only a signature, still sent back.
+					{
+						contentBlockDelta: {
+							contentBlockIndex: 1,
+							delta: { reasoningContent: { signature: "sig-b" } },
+						},
+					},
+					{ contentBlockStop: { contentBlockIndex: 1 } },
+					{
+						contentBlockDelta: {
+							contentBlockIndex: 2,
+							delta: { reasoningContent: { redactedContent: new Uint8Array([1, 2, 3]) } },
+						},
+					},
+					{ contentBlockStop: { contentBlockIndex: 2 } },
+					{ contentBlockDelta: { contentBlockIndex: 3, delta: { text: "Done." } } },
+					{ contentBlockStop: { contentBlockIndex: 3 } },
+					{ messageStop: { stopReason: "end_turn" } },
+				]),
+			})
+
+			const chunks = await collectStream(provider.createMessage("System prompt", messages))
+
+			expect(chunks.filter((chunk) => chunk.type === "thinking_block")).toEqual([
+				{ type: "thinking_block", block: { type: "thinking", thinking: "Let me check.", signature: "sig-a" } },
+				{ type: "thinking_block", block: { type: "thinking", thinking: "", signature: "sig-b" } },
+				{ type: "thinking_block", block: { type: "redacted_thinking", data: "AQID" } },
+			])
+		})
+
+		it("does not collect reasoning blocks for models that don't round-trip them", async () => {
+			const provider = new AwsBedrockHandler({
+				apiModelId: "anthropic.claude-opus-4-8",
+				enableReasoningEffort: true,
+				modelMaxTokens: 32_000,
+			})
+			provider["client"].send = vi.fn().mockResolvedValue({
+				stream: asyncStreamFrom([
+					{ contentBlockDelta: { contentBlockIndex: 0, delta: { reasoningContent: { text: "Hmm." } } } },
+					{ contentBlockDelta: { contentBlockIndex: 0, delta: { reasoningContent: { signature: "sig" } } } },
+					{ contentBlockStop: { contentBlockIndex: 0 } },
+					{ messageStop: { stopReason: "end_turn" } },
+				]),
+			})
+
+			const chunks = await collectStream(provider.createMessage("System prompt", messages))
+
+			expect(chunks.some((chunk) => chunk.type === "thinking_block")).toBe(false)
+		})
+
+		it("sends stored thinking blocks back as reasoningContent in their original position", async () => {
+			const provider = new AwsBedrockHandler({
+				apiModelId: "global.anthropic.claude-opus-5-5",
+				enableReasoningEffort: true,
+				modelMaxTokens: 32_000,
+				awsUsePromptCache: false,
+			})
+			const history: Anthropic.Messages.MessageParam[] = [
+				{ role: "user", content: "Fix it." },
+				{
+					role: "assistant",
+					content: [
+						{ type: "thinking", thinking: "Plan.", signature: "sig-a" },
+						{ type: "tool_use", id: "t1", name: "read_file", input: { path: "a.ts" } },
+					],
+				},
+				{ role: "user", content: [{ type: "tool_result", tool_use_id: "t1", content: "..." }] },
+			]
+			await collectStream(provider.createMessage("System prompt", history))
+
+			const sent = mockConverseStreamCommand.mock.calls[0][0].messages
+			expect(sent?.[1].content).toEqual([
+				{ reasoningContent: { reasoningText: { text: "Plan.", signature: "sig-a" } } },
+				{ toolUse: { toolUseId: "t1", name: "read_file", input: { path: "a.ts" } } },
+			])
 		})
 
 		it.each([

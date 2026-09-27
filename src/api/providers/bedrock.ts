@@ -71,8 +71,9 @@ interface BedrockInferenceConfig {
  * (for example `reasoning_extraction`). Bedrock reports such refusals only as `content_filtered` otherwise.
  * See #1820.
  *
- * ConverseStream resolves these pointers against the native streaming `message_delta` event,
- * where the field sits under `delta`, not against the non-streaming message.
+ * ConverseStream resolves these pointers against the final `message_delta` event of Anthropic's
+ * streaming format, where the field sits under `delta`, not against the non-streaming message.
+ * AWS doesn't document this; Vercel's AI SDK found the same for `/delta/stop_sequence`.
  * Verified live on 2026-09-27: `/stop_details` came back as nothing,
  * while `/delta/stop_details` returned `{"delta":{"stop_details":null}}` in
  * `messageStop.additionalModelResponseFields` on an ordinary turn.
@@ -80,6 +81,7 @@ interface BedrockInferenceConfig {
  *
  * - https://platform.claude.com/docs/en/build-with-claude/refusals-and-fallback#what-a-refusal-looks-like
  * - https://docs.aws.amazon.com/bedrock/latest/userguide/conversation-inference.html#converse-additional-model-response-field-paths
+ * - https://github.com/vercel/ai/commit/afe9730ab7e1d187b5b18b829636046ef5b8eb06
  */
 const ANTHROPIC_RESPONSE_FIELD_PATHS = ["/delta/stop_details"]
 
@@ -117,6 +119,49 @@ const PROGRESS_UPDATE_MODEL_PATTERNS = [
 ] as const
 const THINKING_DISPLAY_UPDATES_BETA = "thinking-display-updates-2026-08-18"
 
+/**
+ * Thinking blocks are sent back to these models with their signatures, across the whole history,
+ * so the model keeps its earlier reasoning instead of starting over at each step.
+ * Anthropic's guidance (thinking#preserving-thinking-blocks):
+ *
+ * > Required: within a tool-use turn, pass thinking blocks back.
+ * > Recommended: across turns, pass everything back.
+ * > Allowed: outside tool use, omit prior turns' thinking.
+ *
+ * Bedrock accepted round-tripped `reasoningContent` blocks for Opus 5.5, Fable 5 and Fable 5.1
+ * in a live test (2026-09-27). Mythos 5.1 wasn't available to test.
+ *
+ * Opus 5.5 and Fable 5.1 bind each block to the conversation prefix before it:
+ * an edited system prompt, tool list or earlier message makes the block invalid.
+ * Zoo edits the prefix (condensing, mode switches, environment details),
+ * so `drop_block` asks the API to drop invalid blocks rather than reject the request,
+ * which it does by default for accounts created on or after 2026-08-31.
+ * It's sent to every model here, not only those two:
+ * AWS says Mythos 5.1 "records the same signature but doesn't run" the check,
+ * and doesn't mention Fable 5, so sending it keeps them safe if that changes.
+ * The same live test accepted it on Opus 5.5, Fable 5 and Fable 5.1, including after a system-prompt edit.
+ *
+ * Zoo can't tell which blocks were dropped, because it uses ConverseStream.
+ * The API lists them in `input_transformations`, which it puts in the `message_start` event
+ * of Anthropic's own streaming format (what InvokeModelWithResponseStream returns unchanged).
+ * AWS documents that ConverseStream returns any field requested in `additionalModelResponseFieldPaths`,
+ * but we observe the opposite for this field (live test, 2026-09-27):
+ * ConverseStream only resolved paths into the final `message_delta` event
+ * (the same behaviour noted at `ANTHROPIC_RESPONSE_FIELD_PATHS`, which Vercel's AI SDK also found).
+ * `/delta/stop_details` and `/usage` came back; `/input_transformations` and
+ * `/message/input_transformations` did not.
+ * Non-streaming Converse and InvokeModelWithResponseStream did return `input_transformations`.
+ *
+ * - https://platform.claude.com/docs/en/build-with-claude/thinking#preserving-thinking-blocks
+ * - https://platform.claude.com/docs/en/build-with-claude/preserved-thinking
+ * - https://docs.aws.amazon.com/bedrock/latest/userguide/claude-messages-thinking-block-binding.html
+ * - https://docs.aws.amazon.com/bedrock/latest/userguide/conversation-inference.html#converse-additional-model-response-field-paths
+ * - https://repost.aws/questions/QUJqYEmLvUTSOCZ6FkRCiqjA (question we asked)
+ */
+const THINKING_BINDING_CONTROLS_BETA = "thinking-binding-controls-2026-08-01"
+
+type ThinkingBlockBinding = { prefix_mismatch_behavior: "error" | "drop_block" }
+
 // Define interface for Bedrock additional model request fields
 // This includes thinking configuration, 1M context beta, and other model-specific parameters
 interface BedrockAdditionalModelFields {
@@ -130,6 +175,7 @@ interface BedrockAdditionalModelFields {
 				type: "adaptive"
 				// "updates" returns only progress-update text, "summarized" also reasoning summaries.
 				display?: "summarized" | "updates" | "omitted"
+				block_binding?: ThinkingBlockBinding
 		  }
 		| { type: "disabled" }
 	output_config?: {
@@ -199,6 +245,8 @@ interface ContentBlockDeltaEvent {
 		// AWS SDK structure for reasoning content deltas
 		reasoningContent?: {
 			text?: string
+			signature?: string
+			redactedContent?: Uint8Array
 		}
 		// Tool use input delta
 		toolUse?: {
@@ -226,6 +274,7 @@ export interface StreamEvent {
 	}
 	contentBlockStart?: ContentBlockStartEvent
 	contentBlockDelta?: ContentBlockDeltaEvent
+	contentBlockStop?: { contentBlockIndex?: number }
 	// Exception events that arrive in-band rather than being thrown
 	internalServerException?: BedrockStreamException
 	modelStreamErrorException?: BedrockStreamException
@@ -419,6 +468,11 @@ export class AwsBedrockHandler extends BaseProvider implements SingleCompletionH
 		return PROGRESS_UPDATE_MODEL_PATTERNS.some((pattern) => baseModelId.includes(pattern))
 	}
 
+	/** Models whose thinking blocks are round-tripped; see THINKING_BINDING_CONTROLS_BETA. */
+	private roundTripsThinking(modelId: string): boolean {
+		return this.writesProgressUpdates(modelId)
+	}
+
 	private isAdaptiveThinkingModel(modelId: string): boolean {
 		const baseModelId = this.parseBaseModelId(modelId)
 		return (
@@ -516,12 +570,14 @@ export class AwsBedrockHandler extends BaseProvider implements SingleCompletionH
 					}`
 				: "default_conversation"
 
+		const keepThinking = this.roundTripsThinking(modelConfig.id)
 		const formatted = this.convertToBedrockConverseMessages(
 			messages,
 			systemPrompt,
 			usePromptCache,
 			modelConfig.info,
 			conversationId,
+			keepThinking,
 		)
 
 		let additionalModelRequestFields: BedrockAdditionalModelFields | undefined
@@ -636,6 +692,13 @@ export class AwsBedrockHandler extends BaseProvider implements SingleCompletionH
 		}
 		const thinkingTextChunk = (text: string): ApiStreamChunk =>
 			thinkingTextIsProgressUpdate ? { type: "progress_update", text } : { type: "reasoning", text }
+
+		if (keepThinking && thinkingDisplay?.type === "adaptive") {
+			thinkingDisplay.block_binding = { prefix_mismatch_behavior: "drop_block" }
+			anthropicBetas.push(THINKING_BINDING_CONTROLS_BETA)
+		}
+		// Reasoning blocks of this response by content-block index, emitted whole at contentBlockStop.
+		const thinkingBlocks = new Map<number, { text: string; signature: string; redacted?: Uint8Array }>()
 
 		// Apply anthropic_beta to additionalModelRequestFields if any betas are needed
 		if (anthropicBetas.length > 0) {
@@ -881,9 +944,21 @@ export class AwsBedrockHandler extends BaseProvider implements SingleCompletionH
 					// - delta.text: standard text content
 					// - delta.toolUse.input: tool input arguments
 					if (delta) {
+						const reasoning = delta.reasoningContent
+						if (keepThinking && reasoning) {
+							const index = cbDelta.contentBlockIndex ?? 0
+							const block = thinkingBlocks.get(index) ?? { text: "", signature: "" }
+							block.text += reasoning.text ?? ""
+							block.signature += reasoning.signature ?? ""
+							if (reasoning.redactedContent) {
+								block.redacted = reasoning.redactedContent
+							}
+							thinkingBlocks.set(index, block)
+						}
+
 						// Check for reasoningContent property (AWS SDK structure)
-						if (delta.reasoningContent?.text) {
-							yield thinkingTextChunk(delta.reasoningContent.text)
+						if (reasoning?.text) {
+							yield thinkingTextChunk(reasoning.text)
 							continue
 						}
 
@@ -907,6 +982,23 @@ export class AwsBedrockHandler extends BaseProvider implements SingleCompletionH
 								type: "text",
 								text: delta.text,
 							}
+						}
+					}
+					continue
+				}
+				if (streamEvent.contentBlockStop) {
+					const index = streamEvent.contentBlockStop.contentBlockIndex ?? 0
+					const block = thinkingBlocks.get(index)
+					thinkingBlocks.delete(index)
+					if (block?.redacted) {
+						yield {
+							type: "thinking_block",
+							block: { type: "redacted_thinking", data: Buffer.from(block.redacted).toString("base64") },
+						}
+					} else if (block?.signature) {
+						yield {
+							type: "thinking_block",
+							block: { type: "thinking", thinking: block.text, signature: block.signature },
 						}
 					}
 					continue
@@ -1116,9 +1208,12 @@ export class AwsBedrockHandler extends BaseProvider implements SingleCompletionH
 		usePromptCache: boolean = false,
 		modelInfo?: any,
 		conversationId?: string, // Optional conversation ID to track cache points across messages
+		keepThinking = false,
 	): { system: SystemContentBlock[]; messages: Message[] } {
 		// First convert messages using shared converter for proper image handling
-		const convertedMessages = sharedConverter(anthropicMessages as Anthropic.Messages.MessageParam[])
+		const convertedMessages = sharedConverter(anthropicMessages as Anthropic.Messages.MessageParam[], {
+			keepThinking,
+		})
 
 		// If prompt caching is disabled, return the converted messages directly
 		if (!usePromptCache) {
