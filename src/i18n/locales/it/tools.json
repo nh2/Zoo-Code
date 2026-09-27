@@ -15,6 +15,7 @@
 		"approval": "Ricerca di '{{query}}' nella base di codice..."
 	},
 	"executeCommand": {
+		"parseRejected": "Il comando non è stato eseguito perché non è stato possibile analizzarlo: {{error}}",
 		"destructiveCommandGuard": {
 			"blocked": "Destructive Command Guard ha bloccato questo comando.",
 			"blockedWithReason": "Destructive Command Guard ha bloccato questo comando. Messaggio da DCG: {{reason}}",

@@ -76,6 +76,21 @@ export function resolveAgentTimeoutMs(timeoutSeconds: number | null | undefined)
 	return process.env.ROO_CLI_RUNTIME === "1" ? 0 : requestedAgentTimeout
 }
 
+/**
+ * Fills in and completes the command row that `handlePartial` streamed.
+ * Without this, a command rejected before `askApproval` leaves that row
+ * partial with whatever text it had last, often empty (see #1820).
+ */
+async function finalizeStreamingCommandRow(task: Task, command: string): Promise<void> {
+	const last = task.clineMessages.at(-1)
+	if (last?.type !== "ask" || last.ask !== "command" || !last.partial) {
+		return
+	}
+	last.text = command
+	last.isAnswered = true
+	await task.completePartialMessage(last)
+}
+
 // Fire-and-forget: some call sites are synchronous terminal callbacks that cannot await,
 // and postMessageToWebview swallows its own errors, so void is enough.
 function postCommandExecutionStatus(provider: ClineProvider | undefined, status: CommandExecutionStatus): void {
@@ -115,6 +130,7 @@ export class ExecuteCommandTool extends BaseTool<"execute_command"> {
 			// command, rather than receiving a generic denial from the approval dialog.
 			const { parseError } = parseCommand(canonicalCommand)
 			if (parseError !== null) {
+				await finalizeStreamingCommandRow(task, canonicalCommand)
 				const executionId = task.lastMessageTs?.toString() ?? Date.now().toString()
 				const provider = await task.providerRef.deref()
 				const errorStatus: CommandExecutionStatus = {
@@ -123,6 +139,7 @@ export class ExecuteCommandTool extends BaseTool<"execute_command"> {
 					message: parseError.message,
 				}
 				postCommandExecutionStatus(provider, errorStatus)
+				await task.say("error", t("tools:executeCommand.parseRejected", { error: parseError.message }))
 				task.didToolFailInCurrentTurn = true
 				pushToolResult(formatResponse.toolError(parseError.message))
 				return

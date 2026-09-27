@@ -15,6 +15,7 @@
 		"approval": "正在搜索代码库中的 '{{query}}'..."
 	},
 	"executeCommand": {
+		"parseRejected": "命令无法解析，因此未执行：{{error}}",
 		"destructiveCommandGuard": {
 			"blocked": "Destructive Command Guard 已拦截此命令。",
 			"blockedWithReason": "Destructive Command Guard 已拦截此命令。来自 DCG 的消息：{{reason}}",

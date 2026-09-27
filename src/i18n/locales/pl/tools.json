@@ -15,6 +15,7 @@
 		"approval": "Wyszukiwanie '{{query}}' w bazie kodu..."
 	},
 	"executeCommand": {
+		"parseRejected": "Polecenie nie zostało uruchomione, bo nie dało się go sparsować: {{error}}",
 		"destructiveCommandGuard": {
 			"blocked": "Destructive Command Guard zablokował to polecenie.",
 			"blockedWithReason": "Destructive Command Guard zablokował to polecenie. Komunikat od DCG: {{reason}}",
