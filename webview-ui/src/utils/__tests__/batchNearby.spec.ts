@@ -338,6 +338,22 @@ describe("batchNearby", () => {
 		expect(result[0].text).toBe("BATCH:match-1,match-2")
 	})
 
+	test("keeps the in-progress request row after a batch visible", () => {
+		const items = [
+			msg("match-1", "ask"),
+			msg("", "say", "api_req_started"),
+			msg("match-2", "ask"),
+			msg("", "say", "api_req_started"),
+		]
+		const result = batchNearby(items, {
+			isTarget: isMatch,
+			isIgnorableBetweenTargets,
+			isBoundary,
+			synthesize: synthesizeBatch,
+		})
+		expect(result.map((m) => m.say ?? m.text)).toEqual(["BATCH:match-1,match-2", "api_req_started"])
+	})
+
 	test("realistic qwen scenario: tool calls with api_req rows between them", () => {
 		const messages = [
 			msg('{"tool":"readFile","path":"a.ts"}', "ask"),
