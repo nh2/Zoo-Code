@@ -2,6 +2,7 @@ export type ApiStream = AsyncGenerator<ApiStreamChunk>
 
 export type ApiStreamChunk =
 	| ApiStreamTextChunk
+	| ApiStreamProgressUpdateChunk
 	| ApiStreamUsageChunk
 	| ApiStreamReasoningChunk
 	| ApiStreamThinkingCompleteChunk
@@ -28,6 +29,20 @@ export interface ApiStreamStopReasonChunk {
 
 export interface ApiStreamTextChunk {
 	type: "text"
+	text: string
+}
+
+/**
+ * Text the model wrote for the user between tool calls, delivered by the provider
+ * inside a `thinking` block rather than a `text` block.
+ *
+ * Rendered like assistant text ahead of the tool call it introduces, but not recorded
+ * as a `text` block in the API history: the provider expects it back as the original
+ * thinking block.
+ * See https://platform.claude.com/docs/en/models/opus-5-5/migration-guide#text-between-tool-calls
+ */
+export interface ApiStreamProgressUpdateChunk {
+	type: "progress_update"
 	text: string
 }
 

@@ -3552,18 +3552,45 @@ export class Task extends EventEmitter<TaskEvents> implements TaskLike {
 								this.presentAssistantMessageSafe()
 								break
 							}
+							case "progress_update": {
+								// Shown like assistant text, but kept out of `assistantMessage`:
+								// the provider expects it back as its thinking block, not as text.
+								const lastBlock = this.assistantMessageContent[this.assistantMessageContent.length - 1]
+								if (lastBlock?.type === "text" && lastBlock.partial && lastBlock.progressUpdate) {
+									lastBlock.content += chunk.text
+								} else {
+									if (lastBlock?.type === "text" && lastBlock.partial) {
+										lastBlock.partial = false
+									}
+									this.assistantMessageContent.push({
+										type: "text",
+										content: chunk.text,
+										partial: true,
+										progressUpdate: true,
+									})
+									this.userMessageContentReady = false
+								}
+								/* v8 ignore next -- streaming presenter; .catch lives in presentAssistantMessageSafe (covered) */
+								this.presentAssistantMessageSafe()
+								break
+							}
 							case "text": {
 								assistantMessage += chunk.text
 
 								// Native tool calling: text chunks are plain text.
 								// Create or update a text content block directly
+								// Blocks accumulate their own chunks: `assistantMessage` spans the whole
+								// response and would repeat earlier text in a block started after a progress update.
 								const lastBlock = this.assistantMessageContent[this.assistantMessageContent.length - 1]
-								if (lastBlock?.type === "text" && lastBlock.partial) {
-									lastBlock.content = assistantMessage
+								if (lastBlock?.type === "text" && lastBlock.partial && !lastBlock.progressUpdate) {
+									lastBlock.content += chunk.text
 								} else {
+									if (lastBlock?.type === "text" && lastBlock.partial) {
+										lastBlock.partial = false
+									}
 									this.assistantMessageContent.push({
 										type: "text",
-										content: assistantMessage,
+										content: chunk.text,
 										partial: true,
 									})
 									this.userMessageContentReady = false

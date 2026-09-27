@@ -39,7 +39,7 @@ import {
 } from "@roo-code/types"
 import { TelemetryService } from "@roo-code/telemetry"
 
-import { ApiStream } from "../transform/stream"
+import type { ApiStream, ApiStreamChunk } from "../transform/stream"
 import { BaseProvider } from "./base-provider"
 import { logger } from "../../utils/logging"
 import { Package } from "../../shared/package"
@@ -622,9 +622,16 @@ export class AwsBedrockHandler extends BaseProvider implements SingleCompletionH
 		}
 
 		const thinkingDisplay = additionalModelRequestFields?.thinking
-		if (thinkingDisplay?.type === "adaptive" && thinkingDisplay.display === "updates") {
+		// Under "updates" only progress-update blocks carry text, so all streamed thinking text
+		// is prose for the user, rendered like assistant text ahead of its tool call.
+		// See https://platform.claude.com/docs/en/build-with-claude/thinking#progress-updates
+		const thinkingTextIsProgressUpdate =
+			thinkingDisplay?.type === "adaptive" && thinkingDisplay.display === "updates"
+		if (thinkingTextIsProgressUpdate) {
 			anthropicBetas.push(THINKING_DISPLAY_UPDATES_BETA)
 		}
+		const thinkingTextChunk = (text: string): ApiStreamChunk =>
+			thinkingTextIsProgressUpdate ? { type: "progress_update", text } : { type: "reasoning", text }
 
 		// Apply anthropic_beta to additionalModelRequestFields if any betas are needed
 		if (anthropicBetas.length > 0) {
@@ -807,6 +814,13 @@ export class AwsBedrockHandler extends BaseProvider implements SingleCompletionH
 
 					// Check if this is a reasoning block (AWS SDK structure)
 					if (cbStart.contentBlock?.reasoningContent) {
+						if (thinkingTextIsProgressUpdate) {
+							// Each update is followed by its own tool call, which already separates them.
+							if (cbStart.contentBlock.reasoningContent.text) {
+								yield thinkingTextChunk(cbStart.contentBlock.reasoningContent.text)
+							}
+							continue
+						}
 						if (cbStart.contentBlockIndex && cbStart.contentBlockIndex > 0) {
 							yield { type: "reasoning", text: "\n" }
 						}
@@ -865,10 +879,7 @@ export class AwsBedrockHandler extends BaseProvider implements SingleCompletionH
 					if (delta) {
 						// Check for reasoningContent property (AWS SDK structure)
 						if (delta.reasoningContent?.text) {
-							yield {
-								type: "reasoning",
-								text: delta.reasoningContent.text,
-							}
+							yield thinkingTextChunk(delta.reasoningContent.text)
 							continue
 						}
 
@@ -886,10 +897,7 @@ export class AwsBedrockHandler extends BaseProvider implements SingleCompletionH
 
 						// Handle alternative thinking structure (fallback for older SDK versions)
 						if (delta.type === "thinking_delta" && delta.thinking) {
-							yield {
-								type: "reasoning",
-								text: delta.thinking,
-							}
+							yield thinkingTextChunk(delta.thinking)
 						} else if (delta.text) {
 							yield {
 								type: "text",

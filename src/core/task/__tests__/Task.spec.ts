@@ -963,6 +963,39 @@ describe("Cline", () => {
 			])
 		})
 
+		it("shows a progress update as text before its tool call without recording it as text", async () => {
+			const task = new Task({
+				provider: mockProvider,
+				apiConfiguration: mockApiConfig,
+				task: "progress update test",
+				startTask: false,
+			})
+			vi.spyOn(task.diffViewProvider, "reset").mockResolvedValue(undefined)
+			vi.spyOn(getTaskTestAccess(task), "safeEnsureModelFetched").mockResolvedValue(stubModelInfo)
+			vi.spyOn(getTaskTestAccess(task), "presentAssistantMessageSafe").mockImplementation(() => {})
+			vi.spyOn(task, "attemptApiRequest").mockImplementation(() =>
+				asyncStreamFrom<ApiStreamChunk>([
+					{ type: "text", text: "Checking the file." },
+					{ type: "progress_update", text: "Re-running the " },
+					{ type: "progress_update", text: "check." },
+					{ type: "tool_call_partial", index: 0, id: "call_read", name: "read_file" },
+					{ type: "tool_call_partial", index: 0, arguments: '{"path":"a.ts"}' },
+				]),
+			)
+
+			await task.recursivelyMakeClineRequests([{ type: "text", text: "progress update test" }])
+
+			expect(task.assistantMessageContent.slice(0, 2)).toMatchObject([
+				{ type: "text", content: "Checking the file." },
+				{ type: "text", content: "Re-running the check.", progressUpdate: true },
+			])
+			const assistantEntry = task.apiConversationHistory.find((message) => message.role === "assistant")
+			expect(assistantEntry?.content).toEqual([
+				{ type: "text", text: "Checking the file." },
+				{ type: "tool_use", id: "call_read", name: "read_file", input: { path: "a.ts" } },
+			])
+		})
+
 		it("blocks a truncated write_to_file call instead of executing it (issue #1221)", async () => {
 			// Regression test for #1221: if the model's stream is cut off mid-way
 			// through a write_to_file tool call's `content` argument (e.g. it hits
