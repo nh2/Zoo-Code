@@ -69,20 +69,24 @@ interface BedrockInferenceConfig {
 /**
  * Asks Bedrock to forward Anthropic's `stop_details`, which names the classifier category behind a refusal
  * (for example `reasoning_extraction`). Bedrock reports such refusals only as `content_filtered` otherwise.
- * A valid pointer the model doesn't return is ignored by Converse. See #1820.
+ * See #1820.
  *
- * Not yet effective: as of 2026-09-26, Opus 5.5 on Bedrock accepted this request field but returned
- * `content_filtered` turns without `additionalModelResponseFields`, so no category was available.
- * Kept because it is harmless and starts working if Bedrock begins forwarding the field.
+ * ConverseStream resolves these pointers against the native streaming `message_delta` event,
+ * where the field sits under `delta`, not against the non-streaming message.
+ * Verified live on 2026-09-27: `/stop_details` came back as nothing,
+ * while `/delta/stop_details` returned `{"delta":{"stop_details":null}}` in
+ * `messageStop.additionalModelResponseFields` on an ordinary turn.
+ * A valid pointer the model doesn't return is ignored.
  *
  * - https://platform.claude.com/docs/en/build-with-claude/refusals-and-fallback#what-a-refusal-looks-like
- * - https://docs.aws.amazon.com/bedrock/latest/APIReference/API_runtime_ConverseStream.html#bedrock-runtime_ConverseStream-request-additionalModelResponseFieldPaths
+ * - https://docs.aws.amazon.com/bedrock/latest/userguide/conversation-inference.html#converse-additional-model-response-field-paths
  */
-const ANTHROPIC_RESPONSE_FIELD_PATHS = ["/stop_details"]
+const ANTHROPIC_RESPONSE_FIELD_PATHS = ["/delta/stop_details"]
 
 /** Renders forwarded `stop_details` as `category: explanation`; the explanation text is unstable, so it's shown, not parsed. */
 export function formatStopDetails(fields: Record<string, unknown> | undefined): string | undefined {
-	const details = fields?.stop_details
+	const delta = fields?.delta
+	const details = delta && typeof delta === "object" ? (delta as Record<string, unknown>).stop_details : undefined
 	if (!details || typeof details !== "object") {
 		return undefined
 	}
