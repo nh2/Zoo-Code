@@ -15,6 +15,7 @@
 		"approval": "Searching for '{{query}}' in codebase..."
 	},
 	"executeCommand": {
+		"parseRejected": "The command was not run because it could not be parsed: {{error}}",
 		"destructiveCommandGuard": {
 			"blocked": "Destructive Command Guard blocked this command.",
 			"blockedWithReason": "Destructive Command Guard blocked this command. Message from DCG: {{reason}}",

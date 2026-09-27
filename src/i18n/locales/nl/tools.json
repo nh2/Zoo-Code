@@ -15,6 +15,7 @@
 		"approval": "Zoeken naar '{{query}}' in codebase..."
 	},
 	"executeCommand": {
+		"parseRejected": "De opdracht is niet uitgevoerd omdat hij niet geparsed kon worden: {{error}}",
 		"destructiveCommandGuard": {
 			"blocked": "Destructive Command Guard heeft deze opdracht geblokkeerd.",
 			"blockedWithReason": "Destructive Command Guard heeft deze opdracht geblokkeerd. Bericht van DCG: {{reason}}",

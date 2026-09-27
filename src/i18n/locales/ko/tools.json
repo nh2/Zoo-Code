@@ -15,6 +15,7 @@
 		"approval": "코드베이스에서 '{{query}}' 검색 중..."
 	},
 	"executeCommand": {
+		"parseRejected": "명령을 파싱할 수 없어서 실행하지 않았어요: {{error}}",
 		"destructiveCommandGuard": {
 			"blocked": "Destructive Command Guard가 이 명령어를 차단했습니다.",
 			"blockedWithReason": "Destructive Command Guard가 이 명령어를 차단했습니다. DCG 메시지: {{reason}}",

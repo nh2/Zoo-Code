@@ -15,6 +15,7 @@
 		"approval": "Đang tìm kiếm '{{query}}' trong cơ sở mã..."
 	},
 	"executeCommand": {
+		"parseRejected": "Lệnh không được chạy vì không thể phân tích cú pháp: {{error}}",
 		"destructiveCommandGuard": {
 			"blocked": "Destructive Command Guard đã chặn lệnh này.",
 			"blockedWithReason": "Destructive Command Guard đã chặn lệnh này. Thông báo từ DCG: {{reason}}",
