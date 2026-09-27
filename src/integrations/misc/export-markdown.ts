@@ -112,6 +112,11 @@ export function formatContentBlockToMarkdown(block: ExtendedContentBlock): strin
 		}
 		case "reasoning":
 			return `[Reasoning]\n${block.text}`
+		case "thinking":
+			return block.thinking ? `[Reasoning]\n${block.thinking}` : ""
+		case "redacted_thinking":
+			// Encrypted by the provider; nothing readable to export.
+			return ""
 		case "thoughtSignature":
 			// Not relevant for human-readable exports
 			return ""

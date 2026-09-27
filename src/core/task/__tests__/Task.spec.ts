@@ -1056,6 +1056,43 @@ describe("Cline", () => {
 			])
 		})
 
+		it("records provider thinking blocks in the order the model produced them", async () => {
+			const task = new Task({
+				provider: mockProvider,
+				apiConfiguration: mockApiConfig,
+				task: "thinking order test",
+				startTask: false,
+			})
+			vi.spyOn(task.diffViewProvider, "reset").mockResolvedValue(undefined)
+			vi.spyOn(getTaskTestAccess(task), "safeEnsureModelFetched").mockResolvedValue(stubModelInfo)
+			vi.spyOn(getTaskTestAccess(task), "presentAssistantMessageSafe").mockImplementation(() => {})
+			vi.spyOn(task, "attemptApiRequest").mockImplementation(() =>
+				asyncStreamFrom<ApiStreamChunk>([
+					{ type: "reasoning", text: "Plan." },
+					{ type: "thinking_block", block: { type: "thinking", thinking: "Plan.", signature: "sig-a" } },
+					{ type: "text", text: "Reading two files." },
+					{ type: "thinking_block", block: { type: "thinking", thinking: "", signature: "sig-b" } },
+					{ type: "tool_call_partial", index: 0, id: "call_a", name: "read_file" },
+					{ type: "tool_call_partial", index: 0, arguments: '{"path":"a.ts"}' },
+					{ type: "thinking_block", block: { type: "redacted_thinking", data: "AQID" } },
+					{ type: "tool_call_partial", index: 1, id: "call_b", name: "read_file" },
+					{ type: "tool_call_partial", index: 1, arguments: '{"path":"b.ts"}' },
+				]),
+			)
+
+			await task.recursivelyMakeClineRequests([{ type: "text", text: "thinking order test" }])
+
+			const assistantEntry = task.apiConversationHistory.find((message) => message.role === "assistant")
+			expect(assistantEntry?.content).toEqual([
+				{ type: "thinking", thinking: "Plan.", signature: "sig-a" },
+				{ type: "text", text: "Reading two files." },
+				{ type: "thinking", thinking: "", signature: "sig-b" },
+				{ type: "tool_use", id: "call_a", name: "read_file", input: { path: "a.ts" } },
+				{ type: "redacted_thinking", data: "AQID" },
+				{ type: "tool_use", id: "call_b", name: "read_file", input: { path: "b.ts" } },
+			])
+		})
+
 		it("shows a progress update as text before its tool call without recording it as text", async () => {
 			const task = new Task({
 				provider: mockProvider,
