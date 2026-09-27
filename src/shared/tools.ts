@@ -39,6 +39,8 @@ export interface TextContent {
 	type: "text"
 	content: string
 	partial: boolean
+	/** Set when the text is a progress update the provider delivered inside a thinking block. */
+	progressUpdate?: boolean
 }
 
 export const toolParamNames = [
