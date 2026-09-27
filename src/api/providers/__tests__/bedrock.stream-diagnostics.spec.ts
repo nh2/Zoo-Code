@@ -162,12 +162,12 @@ describe("AwsBedrockHandler stream diagnostics", () => {
 		})
 
 		describe("stop_details forwarding", () => {
-			it("asks Bedrock to forward Anthropic's stop_details for Claude models", async () => {
+			it("asks Bedrock to forward Anthropic's stop_details from the streaming message_delta", async () => {
 				const handler = createHandler([{ messageStop: { stopReason: "end_turn" } }])
 				await collect(handler)
 
 				const payload = vi.mocked(ConverseStreamCommand).mock.calls[0][0]
-				expect(payload.additionalModelResponseFieldPaths).toEqual(["/stop_details"])
+				expect(payload.additionalModelResponseFieldPaths).toEqual(["/delta/stop_details"])
 			})
 
 			it("appends the refusal category and explanation to the stop reason", async () => {
@@ -177,10 +177,12 @@ describe("AwsBedrockHandler stream diagnostics", () => {
 							messageStop: {
 								stopReason: "content_filtered",
 								additionalModelResponseFields: {
-									stop_details: {
-										type: "refusal",
-										category: "reasoning_extraction",
-										explanation: "Declined to reproduce internal reasoning.",
+									delta: {
+										stop_details: {
+											type: "refusal",
+											category: "reasoning_extraction",
+											explanation: "Declined to reproduce internal reasoning.",
+										},
 									},
 								},
 							},
@@ -201,7 +203,7 @@ describe("AwsBedrockHandler stream diagnostics", () => {
 							messageStop: {
 								stopReason: "content_filtered",
 								additionalModelResponseFields: {
-									stop_details: { type: "refusal", category: null, explanation: null },
+									delta: { stop_details: { type: "refusal", category: null, explanation: null } },
 								},
 							},
 						},
@@ -212,18 +214,34 @@ describe("AwsBedrockHandler stream diagnostics", () => {
 			})
 
 			it("keeps the bare stop reason when stop_details is null", async () => {
+				// Shape Bedrock returned live for an ordinary turn.
 				const chunks = await collect(
 					createHandler([
 						{
 							messageStop: {
 								stopReason: "end_turn",
-								additionalModelResponseFields: { stop_details: null },
+								additionalModelResponseFields: { delta: { stop_details: null } },
 							},
 						},
 					]),
 				)
 
 				expect(chunks).toContainEqual({ type: "stop_reason", reason: "end_turn" })
+			})
+
+			it("ignores stop_details at the top level, where ConverseStream never puts it", async () => {
+				const chunks = await collect(
+					createHandler([
+						{
+							messageStop: {
+								stopReason: "content_filtered",
+								additionalModelResponseFields: { stop_details: { type: "refusal", category: "cyber" } },
+							},
+						},
+					]),
+				)
+
+				expect(chunks).toContainEqual({ type: "stop_reason", reason: "content_filtered" })
 			})
 		})
 	})
