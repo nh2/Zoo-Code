@@ -15,6 +15,7 @@
 		"approval": "कोडबेस में '{{query}}' खोज रहा है..."
 	},
 	"executeCommand": {
+		"parseRejected": "कमांड नहीं चलाया गया क्योंकि इसे पार्स नहीं किया जा सका: {{error}}",
 		"destructiveCommandGuard": {
 			"blocked": "Destructive Command Guard ने इस कमांड को ब्लॉक कर दिया।",
 			"blockedWithReason": "Destructive Command Guard ने इस कमांड को ब्लॉक कर दिया। DCG का संदेश: {{reason}}",

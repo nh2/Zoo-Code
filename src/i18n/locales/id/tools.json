@@ -15,6 +15,7 @@
 		"approval": "Mencari '{{query}}' di codebase..."
 	},
 	"executeCommand": {
+		"parseRejected": "Perintah tidak dijalankan karena tidak bisa di-parse: {{error}}",
 		"destructiveCommandGuard": {
 			"blocked": "Destructive Command Guard memblokir perintah ini.",
 			"blockedWithReason": "Destructive Command Guard memblokir perintah ini. Pesan dari DCG: {{reason}}",

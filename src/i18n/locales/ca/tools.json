@@ -15,6 +15,7 @@
 		"approval": "Cercant '{{query}}' a la base de codi..."
 	},
 	"executeCommand": {
+		"parseRejected": "L'ordre no s'ha executat perquè no s'ha pogut analitzar: {{error}}",
 		"destructiveCommandGuard": {
 			"blocked": "Destructive Command Guard ha bloquejat aquesta ordre.",
 			"blockedWithReason": "Destructive Command Guard ha bloquejat aquesta ordre. Missatge de DCG: {{reason}}",

@@ -6725,6 +6725,67 @@ describe("Cline", () => {
 			saveSpy.mockRestore()
 		})
 
+		it("completePartialMessage clears partial, persists, and posts the update", async () => {
+			const task = new Task({
+				provider: mockProvider,
+				apiConfiguration: mockApiConfig,
+				task: "test task",
+				startTask: false,
+			})
+			const saveSpy = vi.spyOn(getTaskTestAccess(task), "saveClineMessages").mockResolvedValue(true)
+			const message = { ts: 1, type: "ask" as const, ask: "command" as const, text: "ls", partial: true }
+
+			await task.completePartialMessage(message)
+
+			expect(message.partial).toBe(false)
+			expect(saveSpy).toHaveBeenCalledOnce()
+			expect(mockProvider.postMessageToWebview).toHaveBeenCalledWith({
+				type: "messageUpdated",
+				clineMessage: expect.objectContaining({ ts: 1, partial: false }),
+			})
+		})
+
+		it("completePartialMessage leaves complete or missing messages untouched", async () => {
+			const task = new Task({
+				provider: mockProvider,
+				apiConfiguration: mockApiConfig,
+				task: "test task",
+				startTask: false,
+			})
+			const saveSpy = vi.spyOn(getTaskTestAccess(task), "saveClineMessages").mockResolvedValue(true)
+
+			await task.completePartialMessage(undefined)
+			await task.completePartialMessage({ ts: 2, type: "say", say: "text", text: "done", partial: false })
+
+			expect(saveSpy).not.toHaveBeenCalled()
+			expect(mockProvider.postMessageToWebview).not.toHaveBeenCalled()
+		})
+
+		it("completePartialMessage skips the webview update when persistence fails", async () => {
+			const task = new Task({
+				provider: mockProvider,
+				apiConfiguration: mockApiConfig,
+				task: "test task",
+				startTask: false,
+			})
+			vi.spyOn(getTaskTestAccess(task), "saveClineMessages").mockResolvedValue(false)
+			const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {})
+			const message = { ts: 3, type: "ask" as const, ask: "command" as const, text: "ls", partial: true }
+
+			try {
+				await task.completePartialMessage(message)
+
+				expect(mockProvider.postMessageToWebview).not.toHaveBeenCalledWith(
+					expect.objectContaining({ type: "messageUpdated" }),
+				)
+				expect(errorSpy).toHaveBeenCalledWith(
+					"[Task#completePartialMessage] saveClineMessages failed; skipping webview update",
+				)
+			} finally {
+				errorSpy.mockRestore()
+			}
+		})
+
 		it("finalizePartialToolAsk persists and updates a non-last partial tool ask", async () => {
 			let updateSnapshot: Record<string, unknown> | undefined
 			const updateSpy = vi

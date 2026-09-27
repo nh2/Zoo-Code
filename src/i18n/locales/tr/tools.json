@@ -15,6 +15,7 @@
 		"approval": "Kod tabanında '{{query}}' aranıyor..."
 	},
 	"executeCommand": {
+		"parseRejected": "Komut ayrıştırılamadığı için çalıştırılmadı: {{error}}",
 		"destructiveCommandGuard": {
 			"blocked": "Destructive Command Guard bu komutu engelledi.",
 			"blockedWithReason": "Destructive Command Guard bu komutu engelledi. DCG mesajı: {{reason}}",

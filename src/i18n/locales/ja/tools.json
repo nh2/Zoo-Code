@@ -15,6 +15,7 @@
 		"approval": "コードベースで '{{query}}' を検索中..."
 	},
 	"executeCommand": {
+		"parseRejected": "コマンドを解析できなかったため、実行しませんでした: {{error}}",
 		"destructiveCommandGuard": {
 			"blocked": "Destructive Command Guard がこのコマンドをブロックしました。",
 			"blockedWithReason": "Destructive Command Guard がこのコマンドをブロックしました。DCG からのメッセージ: {{reason}}",

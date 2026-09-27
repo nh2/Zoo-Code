@@ -2894,6 +2894,27 @@ export class Task extends EventEmitter<TaskEvents> implements TaskLike {
 		})
 	}
 
+	/**
+	 * Marks a given partial message complete so the webview stops rendering it as in progress.
+	 *
+	 * For callers that have already located the message, including non-`tool` asks that
+	 * finalizePartialToolAsk does not match. Persistence failures are handled the same way.
+	 */
+	public async completePartialMessage(message: ClineMessage | undefined): Promise<void> {
+		if (!message?.partial) {
+			return
+		}
+
+		message.partial = false
+		if (!(await this.saveClineMessages())) {
+			console.error("[Task#completePartialMessage] saveClineMessages failed; skipping webview update")
+			return
+		}
+		await this.updateClineMessage(message).catch((error) => {
+			console.error("[Task#completePartialMessage] updateClineMessage failed:", error)
+		})
+	}
+
 	// Lifecycle
 	// Start / Resume / Abort / Dispose
 

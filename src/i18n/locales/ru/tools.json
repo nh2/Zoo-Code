@@ -15,6 +15,7 @@
 		"approval": "Поиск '{{query}}' в кодовой базе..."
 	},
 	"executeCommand": {
+		"parseRejected": "Команда не выполнена, потому что её не удалось разобрать: {{error}}",
 		"destructiveCommandGuard": {
 			"blocked": "Destructive Command Guard заблокировал эту команду.",
 			"blockedWithReason": "Destructive Command Guard заблокировал эту команду. Сообщение от DCG: {{reason}}",
