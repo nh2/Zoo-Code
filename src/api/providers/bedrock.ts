@@ -162,6 +162,17 @@ const THINKING_BINDING_CONTROLS_BETA = "thinking-binding-controls-2026-08-01"
 
 type ThinkingBlockBinding = { prefix_mismatch_behavior: "error" | "drop_block" }
 
+type ThinkingBlockInProgress = { text: string; signature: string; redacted?: Uint8Array }
+
+function toThinkingBlockChunk(block: ThinkingBlockInProgress): ApiStreamChunk {
+	return block.redacted
+		? {
+				type: "thinking_block",
+				block: { type: "redacted_thinking", data: Buffer.from(block.redacted).toString("base64") },
+			}
+		: { type: "thinking_block", block: { type: "thinking", thinking: block.text, signature: block.signature } }
+}
+
 // Define interface for Bedrock additional model request fields
 // This includes thinking configuration, 1M context beta, and other model-specific parameters
 interface BedrockAdditionalModelFields {
@@ -697,8 +708,8 @@ export class AwsBedrockHandler extends BaseProvider implements SingleCompletionH
 			thinkingDisplay.block_binding = { prefix_mismatch_behavior: "drop_block" }
 			anthropicBetas.push(THINKING_BINDING_CONTROLS_BETA)
 		}
-		// Reasoning blocks of this response by content-block index, emitted whole at contentBlockStop.
-		const thinkingBlocks = new Map<number, { text: string; signature: string; redacted?: Uint8Array }>()
+		// Reasoning blocks of this response by content-block index, emitted whole once complete.
+		const thinkingBlocks = new Map<number, ThinkingBlockInProgress>()
 
 		// Apply anthropic_beta to additionalModelRequestFields if any betas are needed
 		if (anthropicBetas.length > 0) {
@@ -947,7 +958,14 @@ export class AwsBedrockHandler extends BaseProvider implements SingleCompletionH
 						const reasoning = delta.reasoningContent
 						if (keepThinking && reasoning) {
 							const index = cbDelta.contentBlockIndex ?? 0
-							const block = thinkingBlocks.get(index) ?? { text: "", signature: "" }
+							let block = thinkingBlocks.get(index) ?? { text: "", signature: "" }
+							// Under display "updates" Bedrock streams a thinking block and its progress-update
+							// (narration) block under one index; each ends with its own signature, and
+							// sending them back merged fails the signature check.
+							if (block.signature && (reasoning.text !== undefined || reasoning.redactedContent)) {
+								yield toThinkingBlockChunk(block)
+								block = { text: "", signature: "" }
+							}
 							block.text += reasoning.text ?? ""
 							block.signature += reasoning.signature ?? ""
 							if (reasoning.redactedContent) {
@@ -990,16 +1008,8 @@ export class AwsBedrockHandler extends BaseProvider implements SingleCompletionH
 					const index = streamEvent.contentBlockStop.contentBlockIndex ?? 0
 					const block = thinkingBlocks.get(index)
 					thinkingBlocks.delete(index)
-					if (block?.redacted) {
-						yield {
-							type: "thinking_block",
-							block: { type: "redacted_thinking", data: Buffer.from(block.redacted).toString("base64") },
-						}
-					} else if (block?.signature) {
-						yield {
-							type: "thinking_block",
-							block: { type: "thinking", thinking: block.text, signature: block.signature },
-						}
+					if (block?.redacted || block?.signature) {
+						yield toThinkingBlockChunk(block)
 					}
 					continue
 				}
