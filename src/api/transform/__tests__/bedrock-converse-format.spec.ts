@@ -5,6 +5,49 @@ import { Anthropic } from "@anthropic-ai/sdk"
 import { ContentBlock, ToolResultContentBlock } from "@aws-sdk/client-bedrock-runtime"
 import { OPENAI_CALL_ID_MAX_LENGTH } from "../../../utils/tool-id"
 
+describe("convertToBedrockConverseMessages thinking blocks", () => {
+	const turn: Anthropic.Messages.MessageParam = {
+		role: "assistant",
+		content: [
+			{ type: "thinking", thinking: "Plan.", signature: "sig-a" },
+			{ type: "thinking", thinking: "", signature: "sig-b" },
+			{ type: "redacted_thinking", data: "AQID" },
+			{ type: "text", text: "Reading it." },
+			{ type: "tool_use", id: "t1", name: "read_file", input: { path: "a.ts" } },
+		],
+	}
+
+	it("drops them unless asked to keep them, so other models never see them", () => {
+		const [message] = convertToBedrockConverseMessages([turn])
+
+		expect(message.content).toEqual([
+			{ text: "Reading it." },
+			{ toolUse: { toolUseId: "t1", name: "read_file", input: { path: "a.ts" } } },
+		])
+	})
+
+	it("sends them back as reasoningContent in their original order, empty ones included", () => {
+		const [message] = convertToBedrockConverseMessages([turn], { keepThinking: true })
+
+		expect(message.content).toEqual([
+			{ reasoningContent: { reasoningText: { text: "Plan.", signature: "sig-a" } } },
+			{ reasoningContent: { reasoningText: { text: "", signature: "sig-b" } } },
+			{ reasoningContent: { redactedContent: new Uint8Array([1, 2, 3]) } },
+			{ text: "Reading it." },
+			{ toolUse: { toolUseId: "t1", name: "read_file", input: { path: "a.ts" } } },
+		])
+	})
+
+	it("leaves out a thinking block without a signature, which the API would reject", () => {
+		const [message] = convertToBedrockConverseMessages(
+			[{ role: "assistant", content: [{ type: "thinking", thinking: "Plan.", signature: "" }] }],
+			{ keepThinking: true },
+		)
+
+		expect(message.content).toEqual([])
+	})
+})
+
 describe("convertToBedrockConverseMessages", () => {
 	it("converts simple text messages correctly", () => {
 		const messages: Anthropic.Messages.MessageParam[] = [

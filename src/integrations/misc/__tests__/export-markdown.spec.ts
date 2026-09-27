@@ -63,6 +63,14 @@ describe("export-markdown", () => {
 			expect(formatContentBlockToMarkdown(block)).toBe("[Reasoning]\nLet me think about this...")
 		})
 
+		it("exports thinking text and skips empty or redacted thinking blocks", () => {
+			expect(formatContentBlockToMarkdown({ type: "thinking", thinking: "Plan.", signature: "sig" })).toBe(
+				"[Reasoning]\nPlan.",
+			)
+			expect(formatContentBlockToMarkdown({ type: "thinking", thinking: "", signature: "sig" })).toBe("")
+			expect(formatContentBlockToMarkdown({ type: "redacted_thinking", data: "AQID" })).toBe("")
+		})
+
 		it("should skip thoughtSignature blocks", () => {
 			const block = { type: "thoughtSignature" } as ExtendedContentBlock
 			expect(formatContentBlockToMarkdown(block)).toBe("")
