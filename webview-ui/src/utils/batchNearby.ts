@@ -57,6 +57,8 @@ export function batchNearby<T>(items: T[], options: BatchNearbyOptions<T>): T[] 
 					break // boundary stops the batch
 				} else if (isTarget(items[j])) {
 					batch.push(items[j])
+					// Items bridged between two targets are consumed by the batch.
+					pendingIgnorable.length = 0
 					j++
 				} else if (isIgnorableBetweenTargets(items[j], batchContext)) {
 					pendingIgnorable.push(items[j]) // track but don't commit yet
@@ -66,16 +68,10 @@ export function batchNearby<T>(items: T[], options: BatchNearbyOptions<T>): T[] 
 				}
 			}
 
-			if (batch.length > 1) {
-				// Bridge succeeded — pending ignorable items are metadata consumed by the batch
-				result.push(synthesize(batch))
-			} else {
-				// Bridge failed — restore pending ignorable items to preserve in-order semantics
-				result.push(batch[0])
-				if (pendingIgnorable.length > 0) {
-					result.push(...pendingIgnorable)
-				}
-			}
+			result.push(batch.length > 1 ? synthesize(batch) : batch[0])
+			// Items after the last target bridged nothing, so they stay visible:
+			// among them is the in-progress api_req_started row of the next request.
+			result.push(...pendingIgnorable)
 
 			i = j // items[j] was not consumed — re-examine it on next iteration
 		} else {
