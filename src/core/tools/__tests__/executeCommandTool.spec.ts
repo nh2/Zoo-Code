@@ -99,6 +99,7 @@ describe("executeCommandTool", () => {
 		mockCline = {
 			ask: vitest.fn().mockResolvedValue(undefined),
 			say: vitest.fn().mockResolvedValue(undefined),
+			clineMessages: [],
 			sayAndCreateMissingParamError: vitest.fn().mockResolvedValue("Missing parameter error"),
 			consecutiveMistakeCount: 0,
 			didRejectTool: false,
@@ -256,6 +257,44 @@ describe("executeCommandTool", () => {
 				}),
 			)
 			expect(mockAskApproval).not.toHaveBeenCalled()
+			expect(mockCline.say).toHaveBeenCalledWith("error", "executeCommand.parseRejected")
+		})
+
+		it("completes the streamed command row with the rejected command", async () => {
+			const streamedRow = { type: "ask", ask: "command", ts: 1, text: "", partial: true }
+			mockCline.clineMessages = [streamedRow]
+			mockCline.completePartialMessage = vitest.fn().mockResolvedValue(undefined)
+			const command = "git commit -m 'unterminated"
+			mockToolUse.params.command = command
+			mockToolUse.nativeArgs = { command }
+
+			await executeCommandTool.handle(mockCline as unknown as Task, mockToolUse, {
+				askApproval: mockAskApproval as unknown as AskApproval,
+				handleError: mockHandleError as unknown as HandleError,
+				pushToolResult: mockPushToolResult as unknown as PushToolResult,
+				toolCallId: "test-tool-call-id",
+			})
+
+			expect(streamedRow).toMatchObject({ text: command, isAnswered: true })
+			expect(mockCline.completePartialMessage).toHaveBeenCalledWith(streamedRow)
+		})
+
+		it("leaves a non-command last row alone on a parse error", async () => {
+			const otherRow = { type: "say", say: "text", ts: 1, text: "hi", partial: true }
+			mockCline.clineMessages = [otherRow]
+			mockCline.completePartialMessage = vitest.fn().mockResolvedValue(undefined)
+			mockToolUse.params.command = 'echo "unterminated'
+			mockToolUse.nativeArgs = { command: 'echo "unterminated' }
+
+			await executeCommandTool.handle(mockCline as unknown as Task, mockToolUse, {
+				askApproval: mockAskApproval as unknown as AskApproval,
+				handleError: mockHandleError as unknown as HandleError,
+				pushToolResult: mockPushToolResult as unknown as PushToolResult,
+				toolCallId: "test-tool-call-id",
+			})
+
+			expect(otherRow.text).toBe("hi")
+			expect(mockCline.completePartialMessage).not.toHaveBeenCalled()
 		})
 
 		it("posts fallback status when retrying a pre-submission shell integration failure", async () => {
