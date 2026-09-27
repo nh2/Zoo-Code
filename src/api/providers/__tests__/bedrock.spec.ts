@@ -1959,6 +1959,52 @@ describe("AwsBedrockHandler", () => {
 			])
 		})
 
+		it("splits a thinking block and its progress update that Bedrock streams under one index", async () => {
+			const provider = new AwsBedrockHandler({
+				apiModelId: "global.anthropic.claude-opus-5-5",
+				enableReasoningEffort: false,
+				modelMaxTokens: 32_000,
+			})
+			// Shape seen live on 2026-09-27 with display "updates": empty thinking + signature,
+			// then the narration's text + its own signature, all at contentBlockIndex 0.
+			provider["client"].send = vi.fn().mockResolvedValue({
+				stream: asyncStreamFrom([
+					{ contentBlockDelta: { contentBlockIndex: 0, delta: { reasoningContent: { text: "" } } } },
+					{
+						contentBlockDelta: {
+							contentBlockIndex: 0,
+							delta: { reasoningContent: { signature: "sig-thinking" } },
+						},
+					},
+					{
+						contentBlockDelta: {
+							contentBlockIndex: 0,
+							delta: { reasoningContent: { text: "Checking the " } },
+						},
+					},
+					{ contentBlockDelta: { contentBlockIndex: 0, delta: { reasoningContent: { text: "log next." } } } },
+					{
+						contentBlockDelta: {
+							contentBlockIndex: 0,
+							delta: { reasoningContent: { signature: "sig-narration" } },
+						},
+					},
+					{ contentBlockStop: { contentBlockIndex: 0 } },
+					{ messageStop: { stopReason: "end_turn" } },
+				]),
+			})
+
+			const chunks = await collectStream(provider.createMessage("System prompt", messages))
+
+			expect(chunks.filter((chunk) => chunk.type === "thinking_block")).toEqual([
+				{ type: "thinking_block", block: { type: "thinking", thinking: "", signature: "sig-thinking" } },
+				{
+					type: "thinking_block",
+					block: { type: "thinking", thinking: "Checking the log next.", signature: "sig-narration" },
+				},
+			])
+		})
+
 		it("does not collect reasoning blocks for models that don't round-trip them", async () => {
 			const provider = new AwsBedrockHandler({
 				apiModelId: "anthropic.claude-opus-4-8",
