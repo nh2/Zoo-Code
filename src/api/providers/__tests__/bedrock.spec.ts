@@ -1862,6 +1862,47 @@ describe("AwsBedrockHandler", () => {
 			expect(commandArg.inferenceConfig?.temperature).toBeUndefined()
 		})
 
+		it.each([
+			[false, "progress_update"],
+			[true, "reasoning"],
+		] as const)(
+			"with reasoning enabled=%s, streams Claude Opus 5.5 thinking text as %s chunks",
+			async (enableReasoningEffort, expectedType) => {
+				const provider = new AwsBedrockHandler({
+					apiModelId: "global.anthropic.claude-opus-5-5",
+					enableReasoningEffort,
+					modelMaxTokens: 32_000,
+				})
+				provider["client"].send = vi.fn().mockResolvedValue({
+					stream: asyncStreamFrom([
+						{ contentBlockStart: { contentBlockIndex: 0, contentBlock: { reasoningContent: {} } } },
+						{
+							contentBlockDelta: {
+								contentBlockIndex: 0,
+								delta: { reasoningContent: { text: "Re-running the check." } },
+							},
+						},
+						{
+							contentBlockDelta: {
+								contentBlockIndex: 0,
+								delta: { reasoningContent: { signature: "sig" } },
+							},
+						},
+						{ messageStop: { stopReason: "tool_use" } },
+					]),
+				})
+
+				const chunks = await collectStream(provider.createMessage("System prompt", messages))
+
+				const thinkingChunks = chunks.filter(
+					(chunk) => chunk.type === "progress_update" || chunk.type === "reasoning",
+				)
+				expect(thinkingChunks.filter((chunk) => chunk.text !== "")).toEqual([
+					{ type: expectedType, text: "Re-running the check." },
+				])
+			},
+		)
+
 		it.each(["anthropic.claude-sonnet-5", "anthropic.claude-opus-5", "anthropic.claude-opus-4-8"])(
 			"does not request the updates display beta for %s",
 			async (apiModelId) => {
