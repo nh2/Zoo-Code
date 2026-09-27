@@ -4044,6 +4044,12 @@ export class Task extends EventEmitter<TaskEvents> implements TaskLike {
 				})
 				let assistantMessage = ""
 				let reasoningMessage = ""
+				// Provider thinking blocks, each with the number of text/tool blocks that preceded it,
+				// so the turn can be stored in the order the model produced it.
+				const thinkingBlocks: Array<{
+					position: number
+					block: Anthropic.Messages.ThinkingBlockParam | Anthropic.Messages.RedactedThinkingBlockParam
+				}> = []
 				const pendingGroundingSources: GroundingSource[] = []
 				this.isStreaming = true
 
@@ -4252,6 +4258,16 @@ export class Task extends EventEmitter<TaskEvents> implements TaskLike {
 								// tools sequentially and accumulate all results in userMessageContent
 								/* v8 ignore next -- streaming presenter; .catch lives in presentAssistantMessageSafe (covered) */
 								this.presentAssistantMessageSafe()
+								break
+							}
+							case "thinking_block": {
+								const toolCount = this.assistantMessageContent.filter(
+									(block) => block.type === "tool_use" || block.type === "mcp_tool_use",
+								).length
+								thinkingBlocks.push({
+									position: (assistantMessage.length > 0 ? 1 : 0) + toolCount,
+									block: chunk.block,
+								})
 								break
 							}
 							case "progress_update": {
@@ -4859,13 +4875,19 @@ export class Task extends EventEmitter<TaskEvents> implements TaskLike {
 						}
 					}
 
+					const contentWithThinking: Anthropic.Messages.ContentBlockParam[] = [...assistantContent]
+					for (const { position, block } of [...thinkingBlocks].reverse()) {
+						contentWithThinking.splice(Math.min(position, contentWithThinking.length), 0, block)
+					}
+
 					// Save assistant message BEFORE executing tools
 					// This is critical for new_task: when it triggers delegation, flushPendingToolResultsToHistory()
 					// will save the user message with tool_results. The assistant message must already be in history
 					// so that tool_result blocks appear AFTER their corresponding tool_use blocks.
 					await this.addToApiConversationHistory(
-						{ role: "assistant", content: assistantContent },
-						reasoningMessage || undefined,
+						{ role: "assistant", content: contentWithThinking },
+						// The thinking blocks already carry this text; a second copy would only bloat the history.
+						thinkingBlocks.length > 0 ? undefined : reasoningMessage || undefined,
 					)
 
 					this.messageCounts.assistant++
