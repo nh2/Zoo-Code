@@ -2219,6 +2219,63 @@ describe("Task persistence", () => {
 	})
 
 	describe("resumeTaskFromHistory", () => {
+		it.each([
+			{ response: "yesButtonClicked" as const, text: "Also fix the tests", images: ["data:image/png;base64,AAA"] },
+			{ response: "messageResponse" as const, text: "Also fix the tests", images: ["data:image/png;base64,AAA"] },
+		])("forwards chat box input sent with $response to the resumed task", async ({ response, text, images }) => {
+			mockReadApiMessages.mockResolvedValue([{ role: "assistant", content: [{ type: "text", text: "Working" }] }])
+			const task = new Task({
+				provider: mockProvider,
+				apiConfiguration: mockApiConfig,
+				historyItem: {
+					id: "resume-with-input",
+					number: 1,
+					ts: Date.now(),
+					task: "Original task",
+					tokensIn: 10,
+					tokensOut: 5,
+					totalCost: 0.001,
+				},
+				startTask: false,
+			})
+			vi.spyOn(task, "ask").mockResolvedValue({ response, text, images })
+			const say = vi.spyOn(task, "say").mockResolvedValue(undefined)
+			const initiate = vi.spyOn(getTaskPersistenceAccess(task), "initiateTaskLoop").mockResolvedValue(undefined)
+
+			await getTaskPersistenceAccess(task).resumeTaskFromHistory()
+
+			expect(say).toHaveBeenCalledWith("user_feedback", text, images)
+			const content = initiate.mock.calls[0][0]
+			expect(content).toContainEqual({ type: "text", text: `<user_message>\n${text}\n</user_message>` })
+			expect(content).toContainEqual(expect.objectContaining({ type: "image" }))
+		})
+
+		it("resumes without user feedback when Continue is clicked with an empty chat box", async () => {
+			mockReadApiMessages.mockResolvedValue([{ role: "assistant", content: [{ type: "text", text: "Working" }] }])
+			const task = new Task({
+				provider: mockProvider,
+				apiConfiguration: mockApiConfig,
+				historyItem: {
+					id: "resume-without-input",
+					number: 1,
+					ts: Date.now(),
+					task: "Original task",
+					tokensIn: 10,
+					tokensOut: 5,
+					totalCost: 0.001,
+				},
+				startTask: false,
+			})
+			vi.spyOn(task, "ask").mockResolvedValue({ response: "yesButtonClicked" })
+			const say = vi.spyOn(task, "say").mockResolvedValue(undefined)
+			const initiate = vi.spyOn(getTaskPersistenceAccess(task), "initiateTaskLoop").mockResolvedValue(undefined)
+
+			await getTaskPersistenceAccess(task).resumeTaskFromHistory()
+
+			expect(say).not.toHaveBeenCalledWith("user_feedback", expect.anything(), expect.anything())
+			expect(initiate).toHaveBeenCalledWith([{ type: "text", text: "[TASK RESUMPTION] Resuming task..." }])
+		})
+
 		it.each(["not_found", "invalid", "io_error"] as const)(
 			"does not persist when hydration fails with %s",
 			async (kind) => {
