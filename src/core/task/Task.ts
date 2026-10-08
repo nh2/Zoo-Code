@@ -1435,8 +1435,35 @@ export class Task extends EventEmitter<TaskEvents> implements TaskLike {
 		return readTaskMessages({ taskId: this.taskId, globalStoragePath: this.globalStoragePath })
 	}
 
+	/**
+	 * Marks the current last message as complete if it is still partial.
+	 *
+	 * Only the last message can ever be completed:
+	 * `ask()` and `say()` update a partial message only while it is
+	 * `clineMessages.at(-1)`. Once something else is appended after it,
+	 * nothing can finish it any more, and the webview would render it
+	 * as in-progress (spinner) forever. This happens e.g. when a file-edit
+	 * tool streams a partial `tool` ask and then fails with an error `say`
+	 * (or just a tool result, followed by the next `api_req_started`).
+	 */
+	private finalizeSupersededPartialMessage() {
+		const lastMessage = this.clineMessages.at(-1)
+
+		if (!lastMessage?.partial) {
+			return
+		}
+
+		lastMessage.partial = false
+		// The full state post done by the caller carries the change to the webview;
+		// this additionally notifies `Message` listeners.
+		this.updateClineMessage(lastMessage).catch((error) => {
+			console.error("[Task#finalizeSupersededPartialMessage] updateClineMessage failed:", error)
+		})
+	}
+
 	private async addToClineMessages(message: ClineMessage) {
 		message.messageId ??= crypto.randomUUID()
+		this.finalizeSupersededPartialMessage()
 		this.clineMessages.push(message)
 		const provider = this.providerRef.deref()
 		// Unanswered asks must reach the webview before Message listeners can respond against its state.
