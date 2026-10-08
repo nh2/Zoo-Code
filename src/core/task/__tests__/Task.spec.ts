@@ -3733,6 +3733,50 @@ describe("Cline", () => {
 			expect(mockProvider.postStateToWebviewWithoutTaskHistory).not.toHaveBeenCalled()
 		})
 
+		it("finalizes a partial message that gets superseded, so its spinner stops", async () => {
+			// Regression: a failing file edit streams a partial `tool` ask, then reports
+			// the failure with a different message. Nothing ever completed the partial
+			// row, so the webview showed its progress spinner forever.
+			const task = new Task({
+				provider: mockProvider,
+				apiConfiguration: mockApiConfig,
+				task: "test task",
+				startTask: false,
+			})
+			vi.spyOn(getTaskTestAccess(task), "saveClineMessages").mockResolvedValue(true)
+			const messageListener = vi.fn()
+			task.on(RooCodeEventName.Message, messageListener)
+
+			await task.ask("tool", JSON.stringify({ tool: "appliedDiff", path: "a.ts" }), true).catch(() => {})
+			const partialToolAsk = task.clineMessages.at(-1)
+			expect(partialToolAsk).toMatchObject({ type: "ask", ask: "tool", partial: true })
+
+			await task.say("error", "No match found in file")
+
+			expect(partialToolAsk?.partial).toBe(false)
+			expect(task.clineMessages.at(-1)).toMatchObject({ type: "say", say: "error" })
+			expect(messageListener).toHaveBeenCalledWith({ action: "updated", message: partialToolAsk })
+		})
+
+		it("leaves already-complete previous messages untouched when adding a message", async () => {
+			const task = new Task({
+				provider: mockProvider,
+				apiConfiguration: mockApiConfig,
+				task: "test task",
+				startTask: false,
+			})
+			vi.spyOn(getTaskTestAccess(task), "saveClineMessages").mockResolvedValue(true)
+			const previous = { ts: 1, type: "say" as const, say: "text" as const, text: "done" }
+			task.clineMessages.push(previous)
+			const messageListener = vi.fn()
+			task.on(RooCodeEventName.Message, messageListener)
+
+			await task.say("error", "boom")
+
+			expect(previous).not.toHaveProperty("partial")
+			expect(messageListener).not.toHaveBeenCalledWith(expect.objectContaining({ action: "updated" }))
+		})
+
 		it("waits for an unanswered ask flush before emitting the message", async () => {
 			const task = new Task({
 				provider: mockProvider,
