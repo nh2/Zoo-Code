@@ -14,6 +14,7 @@ interface SearchFilesParams {
 	path: string
 	regex: string
 	file_pattern?: string | null
+	include_gitignored?: boolean
 }
 
 export class SearchFilesTool extends BaseTool<"search_files"> {
@@ -56,7 +57,14 @@ export class SearchFilesTool extends BaseTool<"search_files"> {
 		}
 
 		try {
-			const results = await regexSearchFiles(task.cwd, absolutePath, regex, filePattern, task.rooIgnoreController)
+			const results = await regexSearchFiles(
+				task.cwd,
+				absolutePath,
+				regex,
+				filePattern,
+				task.rooIgnoreController,
+				{ includeGitignored: params.include_gitignored === true },
+			)
 
 			const completeMessage = JSON.stringify({ ...sharedMessageProps, content: results } satisfies ClineSayTool)
 			const didApprove = await askApproval("tool", completeMessage)

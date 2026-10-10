@@ -23,6 +23,11 @@ interface ScanContext {
 	ignoreInstance: ReturnType<typeof ignore>
 }
 
+export interface ListFilesOptions {
+	/** List entries excluded by `.gitignore`, `.git/info/exclude` and the global git excludes file. */
+	includeGitignored?: boolean
+}
+
 /**
  * List files in a directory, with optional recursive traversal
  *
@@ -31,7 +36,14 @@ interface ScanContext {
  * @param limit - Maximum number of files to return
  * @returns Tuple of [file paths array, whether the limit was reached]
  */
-export async function listFiles(dirPath: string, recursive: boolean, limit: number): Promise<[string[], boolean]> {
+export async function listFiles(
+	dirPath: string,
+	recursive: boolean,
+	limit: number,
+	options: ListFilesOptions = {},
+): Promise<[string[], boolean]> {
+	const includeGitignored = options.includeGitignored ?? false
+
 	// Early return for limit of 0 - no need to scan anything
 	if (limit === 0) {
 		return [[], false]
@@ -51,10 +63,11 @@ export async function listFiles(dirPath: string, recursive: boolean, limit: numb
 	// Get ripgrep path
 	const rgPath = await getRipgrepPath()
 
+	const ignoreInstance = includeGitignored ? ignore() : await createIgnoreInstance(dirPath)
+
 	if (!recursive) {
 		// For non-recursive, use the existing approach
-		const files = await listFilesWithRipgrep(rgPath, dirPath, false, limit)
-		const ignoreInstance = await createIgnoreInstance(dirPath)
+		const files = await listFilesWithRipgrep(rgPath, dirPath, false, limit, includeGitignored)
 		// Calculate remaining limit for directories
 		const remainingLimit = Math.max(0, limit - files.length)
 		const directories = await listFilteredDirectories(dirPath, false, ignoreInstance, remainingLimit)
@@ -62,8 +75,7 @@ export async function listFiles(dirPath: string, recursive: boolean, limit: numb
 	}
 
 	// For recursive mode, use the original approach but ensure first-level directories are included
-	const files = await listFilesWithRipgrep(rgPath, dirPath, true, limit)
-	const ignoreInstance = await createIgnoreInstance(dirPath)
+	const files = await listFilesWithRipgrep(rgPath, dirPath, true, limit, includeGitignored)
 	// Calculate remaining limit for directories
 	const remainingLimit = Math.max(0, limit - files.length)
 	const directories = await listFilteredDirectories(dirPath, true, ignoreInstance, remainingLimit)
@@ -207,9 +219,10 @@ async function listFilesWithRipgrep(
 	dirPath: string,
 	recursive: boolean,
 	limit: number,
+	includeGitignored: boolean,
 ): Promise<string[]> {
 	const absolutePath = path.resolve(dirPath)
-	const rgArgs = buildRipgrepArgs(".", recursive, dirPath)
+	const rgArgs = buildRipgrepArgs(".", recursive, dirPath, includeGitignored)
 
 	const relativePaths = await execRipgrep(rgPath, rgArgs, limit, absolutePath)
 
@@ -222,15 +235,21 @@ async function listFilesWithRipgrep(
 /**
  * Build appropriate ripgrep arguments based on whether we're doing a recursive search
  */
-function buildRipgrepArgs(searchPath: string, recursive: boolean, targetDirPath: string): string[] {
+function buildRipgrepArgs(
+	searchPath: string,
+	recursive: boolean,
+	targetDirPath: string,
+	includeGitignored: boolean,
+): string[] {
 	// Base arguments to list files
 	const args = ["--files", "--hidden", "--follow"]
+	args.push(...(recursive ? buildRecursiveArgs(targetDirPath) : buildNonRecursiveArgs()))
 
-	if (recursive) {
-		return [...args, ...buildRecursiveArgs(targetDirPath), searchPath]
-	} else {
-		return [...args, ...buildNonRecursiveArgs(), searchPath]
+	if (includeGitignored && !args.includes("--no-ignore-vcs")) {
+		args.push("--no-ignore-vcs")
 	}
+
+	return [...args, searchPath]
 }
 
 /**

@@ -2,6 +2,44 @@ import { NativeToolCallParser, type ToolCallStreamEvent } from "../NativeToolCal
 
 describe("NativeToolCallParser", () => {
 	describe("parseToolCall", () => {
+		describe("include_gitignored", () => {
+			function parseArgs(name: "list_files" | "search_files", args: Record<string, unknown>) {
+				const result = NativeToolCallParser.parseToolCall({
+					id: "toolu_gitignored",
+					name,
+					arguments: JSON.stringify(args),
+				})
+				return result?.type === "tool_use" ? result.nativeArgs : undefined
+			}
+
+			it.each([
+				[true, true],
+				[false, false],
+				["true", true],
+				[null, undefined],
+			])("parses list_files include_gitignored %j as %j", (raw, expected) => {
+				expect(parseArgs("list_files", { path: "notes", recursive: true, include_gitignored: raw })).toEqual({
+					path: "notes",
+					recursive: true,
+					include_gitignored: expected,
+				})
+			})
+
+			it.each([
+				[true, true],
+				[null, undefined],
+			])("parses search_files include_gitignored %j as %j", (raw, expected) => {
+				expect(
+					parseArgs("search_files", {
+						path: "notes",
+						regex: "TODO",
+						file_pattern: null,
+						include_gitignored: raw,
+					}),
+				).toEqual({ path: "notes", regex: "TODO", file_pattern: null, include_gitignored: expected })
+			})
+		})
+
 		describe("read_file tool", () => {
 			it("should parse minimal single-file read_file args", () => {
 				const toolCall = {

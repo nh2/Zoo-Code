@@ -136,7 +136,7 @@ describe("ListFilesTool", () => {
 		await tool.execute(params, mockTask, mockCallbacks)
 
 		const expectedPath = path.resolve(mockTask.cwd, "src")
-		expect(listFiles).toHaveBeenCalledWith(expectedPath, false, 200)
+		expect(listFiles).toHaveBeenCalledWith(expectedPath, false, 200, { includeGitignored: false })
 		expect(formatResponse.formatFilesList).toHaveBeenCalledWith(
 			expectedPath,
 			["file1.ts", "file2.ts"],
@@ -156,7 +156,9 @@ describe("ListFilesTool", () => {
 
 		await tool.execute(params, mockTask, mockCallbacks)
 
-		expect(listFiles).toHaveBeenCalledWith(path.resolve(mockTask.cwd, "src"), true, 200)
+		expect(listFiles).toHaveBeenCalledWith(path.resolve(mockTask.cwd, "src"), true, 200, {
+			includeGitignored: false,
+		})
 		expect(mockCallbacks.askApproval).toHaveBeenCalledWith("tool", expect.stringContaining("listFilesRecursive"))
 		expect(mockCallbacks.pushToolResult).toHaveBeenCalledWith("formatted recursive list")
 	})
@@ -167,7 +169,17 @@ describe("ListFilesTool", () => {
 
 		await tool.execute(params, mockTask, mockCallbacks)
 
-		expect(listFiles).toHaveBeenCalledWith(path.resolve(mockTask.cwd, "src"), false, 200)
+		expect(listFiles).toHaveBeenCalledWith(path.resolve(mockTask.cwd, "src"), false, 200, {
+			includeGitignored: false,
+		})
+	})
+
+	it("should pass include_gitignored through to listFiles", async () => {
+		await tool.execute({ path: "notes", recursive: true, include_gitignored: true }, mockTask, mockCallbacks)
+
+		expect(listFiles).toHaveBeenCalledWith(path.resolve(mockTask.cwd, "notes"), true, 200, {
+			includeGitignored: true,
+		})
 	})
 
 	it("should reset consecutive mistake count on success", async () => {
@@ -279,7 +291,9 @@ describe("ListFilesTool", () => {
 
 		await tool.execute(params, mockTask, mockCallbacks)
 
-		expect(listFiles).toHaveBeenCalledWith(path.resolve(mockTask.cwd, "relative/path"), false, 200)
+		expect(listFiles).toHaveBeenCalledWith(path.resolve(mockTask.cwd, "relative/path"), false, 200, {
+			includeGitignored: false,
+		})
 	})
 
 	it("should pass rooIgnoreController and rooProtectedController to formatFilesList", async () => {
@@ -570,7 +584,9 @@ describe("ListFilesTool", () => {
 
 		await tool.execute(params, mockTask, mockCallbacks)
 
-		expect(listFiles).toHaveBeenCalledWith(path.resolve(mockTask.cwd, "/"), false, 200)
+		expect(listFiles).toHaveBeenCalledWith(path.resolve(mockTask.cwd, "/"), false, 200, {
+			includeGitignored: false,
+		})
 	})
 
 	it("should handle dot path (current directory)", async () => {
@@ -578,7 +594,9 @@ describe("ListFilesTool", () => {
 
 		await tool.execute(params, mockTask, mockCallbacks)
 
-		expect(listFiles).toHaveBeenCalledWith(path.resolve(mockTask.cwd, "."), false, 200)
+		expect(listFiles).toHaveBeenCalledWith(path.resolve(mockTask.cwd, "."), false, 200, {
+			includeGitignored: false,
+		})
 	})
 
 	// ===== Singleton instance test =====

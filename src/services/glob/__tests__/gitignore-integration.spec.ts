@@ -25,6 +25,7 @@ vi.mock("../../path", () => ({
 
 import { listFiles } from "../list-files"
 import * as childProcess from "child_process"
+import type { ChildProcess } from "child_process"
 
 const createMockRipgrepProcess = (chunks: string[] = [], exitCode = 0) => ({
 	stdout: {
@@ -164,5 +165,48 @@ describe("list-files gitignore integration", () => {
 		// Verify that allowed directories ARE included
 		expect(directoriesInResult).toContain(path.join(tempDir, "src") + "/")
 		expect(directoriesInResult).toContain(path.join(tempDir, "allowed-dir") + "/")
+	})
+
+	describe("with includeGitignored", () => {
+		beforeEach(async () => {
+			await fs.promises.mkdir(path.join(tempDir, "notes", "drafts"), { recursive: true })
+			await fs.promises.mkdir(path.join(tempDir, "src"))
+			await fs.promises.writeFile(path.join(tempDir, ".gitignore"), "notes/\n")
+			// The mock only implements the stream members listFiles reads.
+			vi.mocked(childProcess.spawn).mockReturnValue(createMockRipgrepProcess() as unknown as ChildProcess)
+		})
+
+		it.each([true, false])("lists gitignored directories (recursive: %s)", async (recursive) => {
+			const [files] = await listFiles(tempDir, recursive, 100, { includeGitignored: true })
+
+			const [, args] = vi.mocked(childProcess.spawn).mock.calls[0]
+			expect(args).toContain("--no-ignore-vcs")
+			expect(files).toContain(path.join(tempDir, "notes") + "/")
+			expect(files).toContain(path.join(tempDir, "src") + "/")
+		})
+
+		it("descends into gitignored directories in recursive mode", async () => {
+			const [files] = await listFiles(tempDir, true, 100, { includeGitignored: true })
+
+			expect(files).toContain(path.join(tempDir, "notes", "drafts") + "/")
+		})
+
+		it("still hides gitignored directories when false", async () => {
+			const [files] = await listFiles(tempDir, true, 100, { includeGitignored: false })
+
+			const [, args] = vi.mocked(childProcess.spawn).mock.calls[0]
+			expect(args).not.toContain("--no-ignore-vcs")
+			expect(files).not.toContain(path.join(tempDir, "notes") + "/")
+		})
+
+		it("keeps the built-in exclusions such as node_modules", async () => {
+			await fs.promises.mkdir(path.join(tempDir, "node_modules"))
+
+			const [files] = await listFiles(tempDir, true, 100, { includeGitignored: true })
+
+			const [, args] = vi.mocked(childProcess.spawn).mock.calls[0]
+			expect(args).toContain("!**/node_modules/**")
+			expect(files).not.toContain(path.join(tempDir, "node_modules") + "/")
+		})
 	})
 })

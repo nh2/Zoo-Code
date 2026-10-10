@@ -8,18 +8,24 @@ Parameters:
 - path: (required) The path of the directory to search in (relative to the current workspace directory). This directory will be recursively searched.
 - regex: (required) The regular expression pattern to search for. Uses Rust regex syntax.
 - file_pattern: (optional) Glob pattern to filter files (e.g., '*.ts' for TypeScript files). If not provided, it will search all files (*).
+- include_gitignored: (optional) Set true to also search files excluded by .gitignore, e.g. a git-ignored notes or scratch directory. Prefer a narrow path when setting it, since ignored directories such as dependencies or build output can be large.
 
 Example: Searching for all .ts files in the current directory
-{ "path": ".", "regex": ".*", "file_pattern": "*.ts" }
+{ "path": ".", "regex": ".*", "file_pattern": "*.ts", "include_gitignored": null }
 
 Example: Searching for function definitions in JavaScript files
-{ "path": "src", "regex": "function\\s+\\w+", "file_pattern": "*.js" }`
+{ "path": "src", "regex": "function\\s+\\w+", "file_pattern": "*.js", "include_gitignored": null }
+
+Example: Searching a git-ignored notes directory
+{ "path": "notes", "regex": "TODO", "file_pattern": null, "include_gitignored": true }`
 
 const PATH_PARAMETER_DESCRIPTION = `Directory to search recursively, relative to the workspace`
 
 const REGEX_PARAMETER_DESCRIPTION = `Rust-compatible regular expression pattern to match`
 
 const FILE_PATTERN_PARAMETER_DESCRIPTION = `Optional glob to limit which files are searched (e.g., *.ts)`
+
+const INCLUDE_GITIGNORED_PARAMETER_DESCRIPTION = `Set true to also search files excluded by .gitignore`
 
 export default {
 	type: "function",
@@ -42,8 +48,12 @@ export default {
 					type: ["string", "null"],
 					description: FILE_PATTERN_PARAMETER_DESCRIPTION,
 				},
+				include_gitignored: {
+					type: ["boolean", "null"],
+					description: INCLUDE_GITIGNORED_PARAMETER_DESCRIPTION,
+				},
 			},
-			required: ["path", "regex", "file_pattern"],
+			required: ["path", "regex", "file_pattern", "include_gitignored"],
 			additionalProperties: false,
 		},
 	},
