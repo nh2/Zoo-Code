@@ -635,7 +635,6 @@ export const ChatRowContent = ({
 											values: tool.startLine ? { line: tool.startLine } : undefined,
 										})
 									}>
-									{tool.path?.startsWith(".") && <span>.</span>}
 									<PathTooltip content={formatPathTooltip(tool.path, tool.reason)}>
 										<span className="whitespace-nowrap overflow-hidden text-ellipsis text-left mr-2 rtl">
 											{formatPathTooltip(tool.path, tool.reason)}
