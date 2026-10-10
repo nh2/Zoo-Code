@@ -70,7 +70,6 @@ const CodeAccordion = ({
 						</div>
 					) : (
 						<>
-							{path?.startsWith(".") && <span>.</span>}
 							<PathTooltip content={formatPathTooltip(path)}>
 								<span className="whitespace-nowrap overflow-hidden text-ellipsis text-left mr-2 rtl">
 									{formatPathTooltip(path)}

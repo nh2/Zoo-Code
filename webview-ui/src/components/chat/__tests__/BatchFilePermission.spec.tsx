@@ -112,30 +112,22 @@ describe("BatchFilePermission", () => {
 		})
 	})
 
-	it("handles files with paths starting with dot correctly", () => {
-		const filesWithDotPath = [
-			{
-				key: "file1",
-				path: "./src/index.ts",
-				content: "./src/index.ts",
-				lineSnippet: "import React from 'react'",
-			},
-		]
+	it.each(["./src/index.ts", ".roo/rules.md", "/path/to/file", "\\\\server\\share\\index.ts"])(
+		"renders path %s verbatim",
+		(path) => {
+			render(
+				<TranslationProvider>
+					<BatchFilePermission
+						files={[{ key: "file1", path, content: path }]}
+						onPermissionResponse={mockOnPermissionResponse}
+						ts={Date.now()}
+					/>
+				</TranslationProvider>,
+			)
 
-		render(
-			<TranslationProvider>
-				<BatchFilePermission
-					files={filesWithDotPath}
-					onPermissionResponse={mockOnPermissionResponse}
-					ts={Date.now()}
-				/>
-			</TranslationProvider>,
-		)
-
-		// Should render dot before the path
-		expect(screen.getByText(".")).toBeInTheDocument()
-		expect(screen.getByText(/\/src\/index\.ts/)).toBeInTheDocument()
-	})
+			expect(screen.getByText(path + "\u200E")).toBeInTheDocument()
+		},
+	)
 
 	it("re-renders when timestamp changes", () => {
 		const { rerender } = render(
