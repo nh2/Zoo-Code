@@ -14,13 +14,14 @@ import { BaseTool, ToolCallbacks } from "./BaseTool"
 interface ListFilesParams {
 	path: string
 	recursive?: boolean
+	include_gitignored?: boolean
 }
 
 export class ListFilesTool extends BaseTool<"list_files"> {
 	readonly name = "list_files" as const
 
 	async execute(params: ListFilesParams, task: Task, callbacks: ToolCallbacks): Promise<void> {
-		const { path: relDirPath, recursive } = params
+		const { path: relDirPath, recursive, include_gitignored: includeGitignored } = params
 		const { askApproval, handleError, pushToolResult } = callbacks
 
 		try {
@@ -37,7 +38,9 @@ export class ListFilesTool extends BaseTool<"list_files"> {
 			const absolutePath = path.resolve(task.cwd, relDirPath)
 			const isOutsideWorkspace = isPathOutsideWorkspace(absolutePath)
 
-			const [files, didHitLimit] = await listFiles(absolutePath, recursive || false, 200)
+			const [files, didHitLimit] = await listFiles(absolutePath, recursive || false, 200, {
+				includeGitignored: includeGitignored === true,
+			})
 			const { showRooIgnoredFiles = false } = (await task.providerRef.deref()?.getState()) ?? {}
 
 			const result = formatResponse.formatFilesList(

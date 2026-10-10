@@ -1,20 +1,26 @@
 import type OpenAI from "openai"
 
-const LIST_FILES_DESCRIPTION = `Request to list files and directories within the specified directory. If recursive is true, it will list all files and directories recursively. If recursive is false or not provided, it will only list the top-level contents. Do not use this tool to confirm the existence of files you may have created, as the user will let you know if the files were created successfully or not.
+const LIST_FILES_DESCRIPTION = `Request to list files and directories within the specified directory. If recursive is true, it will list all files and directories recursively. If recursive is false or not provided, it will only list the top-level contents. Entries excluded by .gitignore may be omitted unless include_gitignored is true. Do not use this tool to confirm the existence of files you may have created, as the user will let you know if the files were created successfully or not.
 
 Parameters:
 - path: (required) The path of the directory to list contents for (relative to the current workspace directory)
 - recursive: (required) Whether to list files recursively. Use true for recursive listing, false for top-level only.
+- include_gitignored: (optional) Set true to also list entries excluded by .gitignore, e.g. a git-ignored notes or scratch directory. Leave unset otherwise, since ignored directories such as build output can be large.
 
 Example: Listing all files in the current directory (top-level only)
-{ "path": ".", "recursive": false }
+{ "path": ".", "recursive": false, "include_gitignored": null }
 
 Example: Listing all files recursively in src directory
-{ "path": "src", "recursive": true }`
+{ "path": "src", "recursive": true, "include_gitignored": null }
+
+Example: Listing a git-ignored notes directory
+{ "path": "notes", "recursive": true, "include_gitignored": true }`
 
 const PATH_PARAMETER_DESCRIPTION = `Directory path to inspect, relative to the workspace`
 
 const RECURSIVE_PARAMETER_DESCRIPTION = `Set true to list contents recursively; false to show only the top level`
+
+const INCLUDE_GITIGNORED_PARAMETER_DESCRIPTION = `Set true to also list entries excluded by .gitignore`
 
 export default {
 	type: "function",
@@ -33,8 +39,12 @@ export default {
 					type: "boolean",
 					description: RECURSIVE_PARAMETER_DESCRIPTION,
 				},
+				include_gitignored: {
+					type: ["boolean", "null"],
+					description: INCLUDE_GITIGNORED_PARAMETER_DESCRIPTION,
+				},
 			},
-			required: ["path", "recursive"],
+			required: ["path", "recursive", "include_gitignored"],
 			additionalProperties: false,
 		},
 	},

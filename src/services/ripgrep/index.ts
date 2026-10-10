@@ -166,12 +166,18 @@ async function execRipgrep(bin: string, args: string[]): Promise<string> {
 	})
 }
 
+export interface RegexSearchOptions {
+	/** Search files excluded by `.gitignore`, `.git/info/exclude` and the global git excludes file. */
+	includeGitignored?: boolean
+}
+
 export async function regexSearchFiles(
 	cwd: string,
 	directoryPath: string,
 	regex: string,
 	filePattern?: string,
 	rooIgnoreController?: RooIgnoreController,
+	options: RegexSearchOptions = {},
 ): Promise<string> {
 	const vscodeAppRoot = vscode.env.appRoot
 	const rgPath = await getBinPath(vscodeAppRoot)
@@ -186,6 +192,10 @@ export async function regexSearchFiles(
 	// Using --glob "*" overrides .gitignore behavior, so we omit it when no pattern is specified
 	if (filePattern) {
 		args.push("--glob", filePattern)
+	}
+
+	if (options.includeGitignored) {
+		args.push("--no-ignore-vcs")
 	}
 
 	args.push("--context", "1", "--no-messages", directoryPath)

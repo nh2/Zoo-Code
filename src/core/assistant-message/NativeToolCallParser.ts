@@ -616,6 +616,7 @@ export class NativeToolCallParser {
 						path: partialArgs.path,
 						regex: partialArgs.regex,
 						file_pattern: partialArgs.file_pattern,
+						include_gitignored: this.coerceOptionalBoolean(partialArgs.include_gitignored),
 					}
 				}
 				break
@@ -705,6 +706,7 @@ export class NativeToolCallParser {
 					nativeArgs = {
 						path: partialArgs.path,
 						recursive: this.coerceOptionalBoolean(partialArgs.recursive),
+						include_gitignored: this.coerceOptionalBoolean(partialArgs.include_gitignored),
 					}
 				}
 				break
@@ -965,6 +967,7 @@ export class NativeToolCallParser {
 							path: args.path,
 							regex: args.regex,
 							file_pattern: args.file_pattern,
+							include_gitignored: this.coerceOptionalBoolean(args.include_gitignored),
 						} as NativeArgsFor<TName>
 					}
 					break
@@ -1067,6 +1070,7 @@ export class NativeToolCallParser {
 						nativeArgs = {
 							path: args.path,
 							recursive: this.coerceOptionalBoolean(args.recursive),
+							include_gitignored: this.coerceOptionalBoolean(args.include_gitignored),
 						} as NativeArgsFor<TName>
 					}
 					break

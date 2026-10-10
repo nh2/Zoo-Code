@@ -48,6 +48,7 @@ export const toolParamNames = [
 	"regex",
 	"file_pattern",
 	"recursive",
+	"include_gitignored", // list_files and search_files parameter
 	"action",
 	"url",
 	"coordinate",
@@ -119,7 +120,7 @@ export type NativeToolArgs = {
 	search_replace: { file_path: string; old_string: string; new_string: string }
 	edit_file: { file_path: string; old_string: string; new_string: string; expected_replacements?: number }
 	apply_patch: { patch: string }
-	list_files: { path: string; recursive?: boolean }
+	list_files: { path: string; recursive?: boolean; include_gitignored?: boolean }
 	new_task: { mode: string; message: string; todos?: string }
 	ask_followup_question: {
 		question: string
@@ -129,7 +130,7 @@ export type NativeToolArgs = {
 	generate_image: GenerateImageParams
 	run_slash_command: { command: string; args?: string }
 	skill: { skill: string; args?: string }
-	search_files: { path: string; regex: string; file_pattern?: string | null }
+	search_files: { path: string; regex: string; file_pattern?: string | null; include_gitignored?: boolean }
 	switch_mode: { mode_slug: string; reason: string }
 	update_todo_list: { todos: string }
 	use_mcp_tool: { server_name: string; tool_name: string; arguments?: Record<string, unknown> }
