@@ -35,7 +35,6 @@ export const BatchFilePermission = memo(({ files = [], onPermissionResponse, ts 
 							<ToolUseBlock className="flex-1">
 								<ToolUseBlockHeader
 									onClick={() => vscode.postMessage({ type: "openFile", text: file.content })}>
-									{file.path?.startsWith(".") && <span>.</span>}
 									<PathTooltip
 										content={formatPathTooltip(
 											file.path,
