@@ -239,10 +239,9 @@ export const ChatRowContent = ({
 		setEditMode(mode || "code")
 	}, [message.text, message.images, mode])
 
-	// Handle save edit
+	// Stay in edit mode: the backend asks for confirmation, and if the user cancels
+	// they should land back in the editor. A confirmed edit removes this row anyway.
 	const handleSaveEdit = useCallback(() => {
-		setIsEditing(false)
-		// Send edited message to backend
 		vscode.postMessage({
 			type: "submitEditedMessage",
 			value: message.ts,
