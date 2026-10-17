@@ -247,7 +247,9 @@
 	"response": "応答",
 	"arguments": "引数",
 	"text": {
-		"rooSaid": "Zooの発言"
+		"rooSaid": "Zooの発言",
+		"rooProgressUpdate": "Zoo（進捗報告）",
+		"progressUpdateTooltip": "プロバイダーはこれを通常の応答ではなく進捗報告として送信しました。プロバイダーによっては、モデルが書いた内容より短くなっている場合があります。"
 	},
 	"feedback": {
 		"youSaid": "あなたの発言"

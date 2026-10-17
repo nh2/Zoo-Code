@@ -271,6 +271,8 @@ export const clineMessageSchema = z.object({
 	 */
 	contextTruncation: contextTruncationSchema.optional(),
 	isProtected: z.boolean().optional(),
+	/** Text the provider delivered as a progress update (inside a thinking block), not as a regular response. */
+	progressUpdate: z.boolean().optional(),
 	apiProtocol: z.union([z.literal("openai"), z.literal("anthropic")]).optional(),
 	isAnswered: z.boolean().optional(),
 	autoApprovalDecision: z.union([z.literal("approve"), z.literal("deny")]).optional(),

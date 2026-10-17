@@ -42,6 +42,7 @@ export const toolNames = [
 	"new_task",
 	"codebase_search",
 	"update_todo_list",
+	"send_user_message",
 	"run_slash_command",
 	"skill",
 	"generate_image",

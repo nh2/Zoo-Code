@@ -586,6 +586,14 @@ export class NativeToolCallParser {
 				}
 				break
 
+			case "send_user_message":
+				if (partialArgs.message !== undefined) {
+					nativeArgs = {
+						message: partialArgs.message,
+					}
+				}
+				break
+
 			case "use_mcp_tool":
 				if (partialArgs.server_name !== undefined || partialArgs.tool_name !== undefined) {
 					nativeArgs = {
@@ -933,6 +941,14 @@ export class NativeToolCallParser {
 					if (args.todos !== undefined) {
 						nativeArgs = {
 							todos: args.todos,
+						} as NativeArgsFor<TName>
+					}
+					break
+
+				case "send_user_message":
+					if (args.message !== undefined) {
+						nativeArgs = {
+							message: args.message,
 						} as NativeArgsFor<TName>
 					}
 					break

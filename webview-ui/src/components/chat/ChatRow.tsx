@@ -1208,11 +1208,17 @@ export const ChatRowContent = ({
 						<div className="group">
 							<div style={headerStyle}>
 								<MessageCircle className="w-4 shrink-0" aria-label="Speech bubble icon" />
-								<span style={{ fontWeight: "bold" }}>{t("chat:text.rooSaid")}</span>
+								{message.progressUpdate ? (
+									<span className="font-bold" title={t("chat:text.progressUpdateTooltip")}>
+										{t("chat:text.rooProgressUpdate")}
+									</span>
+								) : (
+									<span style={{ fontWeight: "bold" }}>{t("chat:text.rooSaid")}</span>
+								)}
 								<div style={{ flexGrow: 1 }} />
 								<OpenMarkdownPreviewButton markdown={message.text} />
 							</div>
-							<div className="pl-6">
+							<div className={cn("pl-6", message.progressUpdate && "text-vscode-descriptionForeground")}>
 								<Markdown markdown={message.text} partial={message.partial} />
 								{message.images && message.images.length > 0 && (
 									<div style={{ marginTop: "10px" }}>

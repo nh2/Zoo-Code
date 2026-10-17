@@ -165,6 +165,12 @@ export const modelInfoSchema = z.object({
 	// Cannot force-add tools from groups the mode doesn't allow
 	includedTools: z.array(z.string()).optional(),
 	/**
+	 * The provider returns text the model writes between tool calls only as a short summary,
+	 * so verbatim content must go through `send_user_message`.
+	 * See https://platform.claude.com/docs/en/build-with-claude/prompt-engineering/prompting-claude-opus-5-5#user-facing-progress-updates
+	 */
+	summarizesTextBetweenToolCalls: z.boolean().optional(),
+	/**
 	 * Service tiers with pricing information.
 	 * Each tier can have a name (for OpenAI service tiers) and pricing overrides.
 	 * The top-level input/output/cache* fields represent the default/standard tier.

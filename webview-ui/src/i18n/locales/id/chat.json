@@ -298,7 +298,9 @@
 	"response": "Respons",
 	"arguments": "Argumen",
 	"text": {
-		"rooSaid": "Zoo berkata"
+		"rooSaid": "Zoo berkata",
+		"rooProgressUpdate": "Zoo (pembaruan progres)",
+		"progressUpdateTooltip": "Penyedia mengirim ini sebagai pembaruan progres, bukan sebagai respons biasa. Tergantung penyedianya, isinya bisa lebih pendek daripada yang ditulis model."
 	},
 	"feedback": {
 		"youSaid": "Anda bilang"

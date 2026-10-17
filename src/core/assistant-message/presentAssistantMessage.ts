@@ -33,6 +33,7 @@ import { switchModeTool } from "../tools/SwitchModeTool"
 import { attemptCompletionTool, AttemptCompletionCallbacks } from "../tools/AttemptCompletionTool"
 import { newTaskTool } from "../tools/NewTaskTool"
 import { updateTodoListTool } from "../tools/UpdateTodoListTool"
+import { sendUserMessageTool } from "../tools/SendUserMessageTool"
 import { runSlashCommandTool } from "../tools/RunSlashCommandTool"
 import { skillTool } from "../tools/SkillTool"
 import { generateImageTool } from "../tools/GenerateImageTool"
@@ -452,7 +453,13 @@ async function presentAssistantMessageBlock(cline: Task): Promise<void> {
 				content = content.replace(/\s?<\/thinking>/g, "")
 			}
 
-			await cline.say("text", content, undefined, block.partial)
+			if (block.progressUpdate) {
+				await cline.say("text", content, undefined, block.partial, undefined, undefined, {
+					progressUpdate: true,
+				})
+			} else {
+				await cline.say("text", content, undefined, block.partial)
+			}
 			break
 		}
 		case "tool_use": {
@@ -529,6 +536,8 @@ async function presentAssistantMessageBlock(cline: Task): Promise<void> {
 					case "read_command_output":
 						return `[${block.name} for '${block.params.artifact_id}']`
 					case "update_todo_list":
+						return `[${block.name}]`
+					case "send_user_message":
 						return `[${block.name}]`
 					case "new_task": {
 						const mode = block.params.mode ?? defaultModeSlug
@@ -899,6 +908,13 @@ async function presentAssistantMessageBlock(cline: Task): Promise<void> {
 					break
 				case "update_todo_list":
 					await updateTodoListTool.handle(cline, block as ToolUse<"update_todo_list">, {
+						askApproval,
+						handleError,
+						pushToolResult,
+					})
+					break
+				case "send_user_message":
+					await sendUserMessageTool.handle(cline, block as ToolUse<"send_user_message">, {
 						askApproval,
 						handleError,
 						pushToolResult,

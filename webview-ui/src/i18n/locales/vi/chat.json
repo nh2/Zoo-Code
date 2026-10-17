@@ -248,7 +248,9 @@
 	"response": "Phản hồi",
 	"arguments": "Tham số",
 	"text": {
-		"rooSaid": "Zoo đã nói"
+		"rooSaid": "Zoo đã nói",
+		"rooProgressUpdate": "Zoo (cập nhật tiến độ)",
+		"progressUpdateTooltip": "Nhà cung cấp đã gửi nội dung này dưới dạng cập nhật tiến độ, không phải phản hồi thông thường. Tùy nhà cung cấp, nội dung có thể ngắn hơn những gì mô hình đã viết."
 	},
 	"feedback": {
 		"youSaid": "Bạn đã nói"

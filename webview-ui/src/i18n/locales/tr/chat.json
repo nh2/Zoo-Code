@@ -248,7 +248,9 @@
 	"response": "Yanıt",
 	"arguments": "Argümanlar",
 	"text": {
-		"rooSaid": "Zoo dedi"
+		"rooSaid": "Zoo dedi",
+		"rooProgressUpdate": "Zoo (ilerleme güncellemesi)",
+		"progressUpdateTooltip": "Sağlayıcı bunu normal bir yanıt olarak değil, ilerleme güncellemesi olarak gönderdi. Sağlayıcıya bağlı olarak, modelin yazdığından daha kısa olabilir."
 	},
 	"feedback": {
 		"youSaid": "Dediniz ki"

@@ -1573,6 +1573,11 @@ export class AwsBedrockHandler extends BaseProvider implements SingleCompletionH
 			}
 		}
 
+		if (this.writesProgressUpdates(modelConfig.id)) {
+			// Every thinking.display returns these models' text between tool calls only as a summary.
+			modelConfig.info = { ...modelConfig.info, summarizesTextBetweenToolCalls: true }
+		}
+
 		// Don't override maxTokens/contextWindow here; handled in getModelById (and includes user overrides)
 		return { ...modelConfig, ...params } as {
 			id: BedrockModelId | string

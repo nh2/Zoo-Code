@@ -339,6 +339,20 @@ describe("presentAssistantMessage - Custom Tool Recording", () => {
 			expect(mockTask.presentAssistantMessageLocked).toBe(false)
 		})
 
+		it("marks a progress-update text block when showing it", async () => {
+			mockTask.assistantMessageContent = [
+				{ type: "text", content: "Checking the log.", partial: false, progressUpdate: true },
+				{ type: "text", content: "Plain answer.", partial: false },
+			]
+
+			await presentAssistantMessage(mockTask)
+
+			expect(mockTask.say.mock.calls).toEqual([
+				["text", "Checking the log.", undefined, false, undefined, undefined, { progressUpdate: true }],
+				["text", "Plain answer.", undefined, false],
+			])
+		})
+
 		it("stops internal continuation when the task aborts between blocks", async () => {
 			mockTask.assistantMessageContent = [
 				{ type: "text", content: "first", partial: false },

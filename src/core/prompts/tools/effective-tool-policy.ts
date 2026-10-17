@@ -280,6 +280,11 @@ export function resolveEffectiveToolPolicy(input: EffectiveToolPolicyInput): Eff
 		allowedToolNames.delete("update_todo_list")
 	}
 
+	// 6b. Drop send_user_message unless the model's in-between text reaches the user only as a summary.
+	if (modelInfo?.summarizesTextBetweenToolCalls !== true) {
+		allowedToolNames.delete("send_user_message")
+	}
+
 	// 7. Drop generate_image unless the image-generation experiment is enabled.
 	if (experiments?.imageGeneration !== true) {
 		allowedToolNames.delete("generate_image")

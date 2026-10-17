@@ -242,7 +242,9 @@
 	"response": "Antwoord",
 	"arguments": "Argumenten",
 	"text": {
-		"rooSaid": "Zoo zei"
+		"rooSaid": "Zoo zei",
+		"rooProgressUpdate": "Zoo (voortgangsupdate)",
+		"progressUpdateTooltip": "De provider heeft dit als voortgangsupdate gestuurd, niet als normaal antwoord. Afhankelijk van de provider kan het korter zijn dan wat het model schreef."
 	},
 	"feedback": {
 		"youSaid": "Jij zei"

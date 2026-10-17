@@ -186,6 +186,21 @@ describe("resolveEffectiveToolPolicy - conditional gates", () => {
 		expect(modeWithoutIndex.tools.has("codebase_search")).toBe(false)
 	})
 
+	it("offers send_user_message only when the model summarizes text between tool calls", () => {
+		expect(policyFor(["read"]).tools.has("send_user_message")).toBe(false)
+		expect(policyFor(["read"], { modelInfo: modelInfo() }).tools.has("send_user_message")).toBe(false)
+		expect(
+			policyFor(["read"], { modelInfo: modelInfo({ summarizesTextBetweenToolCalls: false }) }).tools.has(
+				"send_user_message",
+			),
+		).toBe(false)
+		expect(
+			policyFor(["read"], { modelInfo: modelInfo({ summarizesTextBetweenToolCalls: true }) }).tools.has(
+				"send_user_message",
+			),
+		).toBe(true)
+	})
+
 	it("drops update_todo_list when todoListEnabled is false", () => {
 		expect(policyFor(["read", "edit", "command"], { todoListEnabled: false }).tools.has("update_todo_list")).toBe(
 			false,

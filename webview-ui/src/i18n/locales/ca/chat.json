@@ -247,7 +247,9 @@
 	"response": "Resposta",
 	"arguments": "Arguments",
 	"text": {
-		"rooSaid": "En Zoo ha dit"
+		"rooSaid": "En Zoo ha dit",
+		"rooProgressUpdate": "Zoo (actualització de progrés)",
+		"progressUpdateTooltip": "El proveïdor ha enviat això com a actualització de progrés, no com a resposta normal. Segons el proveïdor, pot ser més curt del que ha escrit el model."
 	},
 	"feedback": {
 		"youSaid": "Has dit"

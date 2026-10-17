@@ -181,6 +181,21 @@ describe("AwsBedrockHandler", () => {
 			expect(modelInfo.info.contextWindow).toBeDefined()
 		})
 
+		it.each([
+			["anthropic.claude-opus-5-5", true],
+			["anthropic.claude-3-5-sonnet-20241022-v2:0", false],
+		])("flags whether %s returns text between tool calls only as a summary", (apiModelId, expected) => {
+			const modelHandler = new AwsBedrockHandler({
+				apiModelId,
+				awsAccessKey: "test-access-key",
+				awsSecretKey: "test-secret-key",
+				awsRegion: "us-east-1",
+				awsUseCrossRegionInference: true,
+			})
+
+			expect(modelHandler.getModel().info.summarizesTextBetweenToolCalls === true).toBe(expected)
+		})
+
 		it("should identify itself as Zoo Code in the AWS client app id", () => {
 			expect(mockBedrockRuntimeClient).toHaveBeenCalledWith(
 				expect.objectContaining({

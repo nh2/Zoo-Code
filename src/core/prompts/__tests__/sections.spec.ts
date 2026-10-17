@@ -364,6 +364,16 @@ describe("getRulesSection", () => {
 		)
 	})
 
+	it("tells the model to use send_user_message only when the tool is offered", () => {
+		const summarizing = { contextWindow: 128_000, supportsPromptCache: true, summarizesTextBetweenToolCalls: true }
+		const withTool = getRulesSection(cwd, settings, policyFor(["read"], { modelInfo: summarizing }))
+		expect(withTool).toContain("reaches the user only as a short summary")
+		expect(withTool).toContain("send_user_message")
+
+		const withoutTool = getRulesSection(cwd, settings, policyFor(["read"]))
+		expect(withoutTool).not.toContain("send_user_message")
+	})
+
 	it("omits the read_file rule when read_file is absent", () => {
 		const result = getRulesSection(cwd, settings, policyFor(["command"]))
 		expect(result).not.toContain("The user may provide a file's contents directly")

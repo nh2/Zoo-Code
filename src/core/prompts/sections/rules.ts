@@ -83,6 +83,7 @@ export function getRulesSection(
 	const chainNote = getCommandChainNote()
 
 	const hasExecuteCommand = policy.tools.has("execute_command")
+	const hasSendUserMessage = policy.tools.has("send_user_message")
 	const hasAskFollowupQuestion = policy.tools.has("ask_followup_question")
 	const hasListFiles = policy.tools.has("list_files")
 	const hasReadFile = policy.tools.has("read_file")
@@ -132,6 +133,12 @@ export function getRulesSection(
 			? "Do not ask for more information than necessary. Use the tools provided to accomplish the user's request efficiently and effectively. When you've completed your task, you must use the attempt_completion tool to present the result to the user. The user may provide feedback, which you can use to make improvements and try again."
 			: "Do not ask for more information than necessary. Use the tools provided to accomplish the user's request efficiently and effectively. When you've completed your task, present the result to the user. The user may provide feedback, which you can use to make improvements and try again.",
 	)
+
+	if (hasSendUserMessage) {
+		rules.push(
+			"Text you write outside tool calls reaches the user only as a short summary. Put anything the user must see exactly (links, file paths, exact numbers, code, commands, lists of results) into a send_user_message call, or into the attempt_completion result or ask_followup_question question. send_user_message does not end or pause your turn.",
+		)
+	}
 
 	if (hasAskFollowupQuestion) {
 		rules.push(

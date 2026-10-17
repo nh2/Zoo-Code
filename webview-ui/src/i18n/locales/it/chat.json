@@ -247,7 +247,9 @@
 	"response": "Risposta",
 	"arguments": "Argomenti",
 	"text": {
-		"rooSaid": "Zoo ha detto"
+		"rooSaid": "Zoo ha detto",
+		"rooProgressUpdate": "Zoo (aggiornamento sui progressi)",
+		"progressUpdateTooltip": "Il provider ha inviato questo come aggiornamento sui progressi, non come risposta normale. A seconda del provider, potrebbe essere più breve di quanto scritto dal modello."
 	},
 	"feedback": {
 		"youSaid": "Hai detto"

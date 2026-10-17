@@ -290,7 +290,9 @@
 	"response": "Response",
 	"arguments": "Arguments",
 	"text": {
-		"rooSaid": "Zoo said"
+		"rooSaid": "Zoo said",
+		"rooProgressUpdate": "Zoo (progress update)",
+		"progressUpdateTooltip": "The provider sent this as a progress update, not as a regular response. Depending on the provider, it may be shorter than what the model wrote."
 	},
 	"feedback": {
 		"youSaid": "You said"

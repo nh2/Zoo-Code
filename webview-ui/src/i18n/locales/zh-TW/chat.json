@@ -293,7 +293,9 @@
 	"response": "回應",
 	"arguments": "參數",
 	"text": {
-		"rooSaid": "Zoo 說"
+		"rooSaid": "Zoo 說",
+		"rooProgressUpdate": "Zoo（進度更新）",
+		"progressUpdateTooltip": "供應商將此作為進度更新傳送，而非一般回應。視供應商而定，內容可能比模型實際寫的更短。"
 	},
 	"feedback": {
 		"youSaid": "您說"

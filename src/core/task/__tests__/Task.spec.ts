@@ -2384,6 +2384,38 @@ describe("Cline", () => {
 		})
 	})
 
+	describe("say progressUpdate flag", () => {
+		it("marks a streamed progress update on the chat message and leaves ordinary text unmarked", async () => {
+			const access = getTaskTestAccess(Task.prototype)
+			const saveSpy = vi.spyOn(access, "saveClineMessages").mockResolvedValue(true)
+			const updateSpy = vi.spyOn(access, "updateClineMessage").mockResolvedValue(undefined)
+			const task = new Task({
+				provider: mockProvider,
+				apiConfiguration: mockApiConfig,
+				task: "test task",
+				startTask: false,
+			})
+
+			await task.say("text", "Checking", undefined, true, undefined, undefined, { progressUpdate: true })
+			await task.say("text", "Checking the log.", undefined, false, undefined, undefined, {
+				progressUpdate: true,
+			})
+			await task.say("text", "Plain answer.")
+
+			const [update, plain] = task.clineMessages.slice(-2)
+			expect(update).toMatchObject({
+				say: "text",
+				text: "Checking the log.",
+				partial: false,
+				progressUpdate: true,
+			})
+			expect(plain).toMatchObject({ say: "text", text: "Plain answer." })
+			expect(plain).not.toHaveProperty("progressUpdate")
+			saveSpy.mockRestore()
+			updateSpy.mockRestore()
+		})
+	})
+
 	describe("sayAndCreateMissingParamError", () => {
 		it("surfaces a localized error notice and returns the missing-parameter tool error for both relPath branches", async () => {
 			const cline = new Task({
