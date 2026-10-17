@@ -275,6 +275,8 @@ export const clineMessageSchema = z.object({
 	// Older delegation messages lack this stamp and require positional link resolution.
 	childTaskId: z.string().optional(),
 	isProtected: z.boolean().optional(),
+	/** Text the provider delivered as a progress update (inside a thinking block), not as a regular response. */
+	progressUpdate: z.boolean().optional(),
 	apiProtocol: z.union([z.literal("openai"), z.literal("anthropic")]).optional(),
 	isAnswered: z.boolean().optional(),
 	autoApprovalDecision: z.union([z.literal("approve"), z.literal("deny")]).optional(),

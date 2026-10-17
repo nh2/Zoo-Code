@@ -133,6 +133,7 @@ export type NativeToolArgs = {
 	search_files: { path: string; regex: string; file_pattern?: string | null; include_gitignored?: boolean }
 	switch_mode: { mode_slug: string; reason: string }
 	update_todo_list: { todos: string }
+	send_user_message: { message: string }
 	use_mcp_tool: { server_name: string; tool_name: string; arguments?: Record<string, unknown> }
 	write_to_file: { path: string; content: string }
 	// Add more tools as they are migrated to native protocol
@@ -234,6 +235,7 @@ export const ALWAYS_AVAILABLE_TOOLS: ToolName[] = [
 	"switch_mode",
 	"new_task",
 	"update_todo_list",
+	"send_user_message",
 	"run_slash_command",
 	"skill",
 ] as const

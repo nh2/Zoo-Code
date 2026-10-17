@@ -2849,6 +2849,7 @@ export class Task extends EventEmitter<TaskEvents> implements TaskLike {
 		progressStatus?: ToolProgressStatus,
 		options: {
 			isNonInteractive?: boolean
+			progressUpdate?: boolean
 		} = {},
 		contextCondense?: ContextCondense,
 		contextTruncation?: ContextTruncation,
@@ -2856,6 +2857,8 @@ export class Task extends EventEmitter<TaskEvents> implements TaskLike {
 		if (this.abort) {
 			throw new Error(`[RooCode#say] task ${this.taskId}.${this.instanceId} aborted`)
 		}
+
+		const progressUpdateField = options.progressUpdate ? { progressUpdate: true } : {}
 
 		if (partial !== undefined) {
 			const lastMessage = this.clineMessages.at(-1)
@@ -2894,6 +2897,7 @@ export class Task extends EventEmitter<TaskEvents> implements TaskLike {
 						partial,
 						contextCondense,
 						contextTruncation,
+						...progressUpdateField,
 					})
 				}
 			} else {
@@ -2936,6 +2940,7 @@ export class Task extends EventEmitter<TaskEvents> implements TaskLike {
 						images,
 						contextCondense,
 						contextTruncation,
+						...progressUpdateField,
 					})
 				}
 			}
@@ -2960,6 +2965,7 @@ export class Task extends EventEmitter<TaskEvents> implements TaskLike {
 				checkpoint,
 				contextCondense,
 				contextTruncation,
+				...progressUpdateField,
 			})
 		}
 	}
