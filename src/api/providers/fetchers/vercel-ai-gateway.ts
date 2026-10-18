@@ -147,6 +147,7 @@ export const parseVercelAiGatewayModel = ({ id, model }: { id: string; model: Ve
 
 	if (id === "anthropic/claude-fable-5.1" || id === "anthropic/claude-fable-5") {
 		modelInfo.supportsTemperature = false
+		modelInfo.summarizesTextBetweenToolCalls = true
 	}
 
 	if (id === "anthropic/claude-sonnet-5") {
@@ -159,6 +160,7 @@ export const parseVercelAiGatewayModel = ({ id, model }: { id: string; model: Ve
 
 	if (id === "anthropic/claude-opus-5-5") {
 		modelInfo.supportsTemperature = false
+		modelInfo.summarizesTextBetweenToolCalls = true
 	}
 
 	if (id === "anthropic/claude-haiku-5.5") {
