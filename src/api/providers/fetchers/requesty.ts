@@ -55,6 +55,7 @@ export async function getRequestyModels(
 				modelInfo.supportsReasoningBudget = true
 				modelInfo.supportsReasoningBinary = true
 				modelInfo.supportsTemperature = false
+				modelInfo.summarizesTextBetweenToolCalls = true
 			}
 
 			if (rawModel.id === "anthropic/claude-sonnet-5") {
@@ -73,6 +74,7 @@ export async function getRequestyModels(
 				modelInfo.supportsReasoningBudget = true
 				modelInfo.supportsReasoningBinary = true
 				modelInfo.supportsTemperature = false
+				modelInfo.summarizesTextBetweenToolCalls = true
 			}
 
 			models[rawModel.id] = modelInfo

@@ -743,6 +743,16 @@ describe("AnthropicHandler", () => {
 			expect(model.reasoningBudget).toBeUndefined()
 		})
 
+		it.each([
+			["claude-fable-5", true],
+			["claude-fable-5-1", true],
+			["claude-opus-5", undefined],
+			["claude-sonnet-5", undefined],
+		])("flags whether %s returns text between tool calls only as a summary", (apiModelId, expected) => {
+			const handler = new AnthropicHandler({ apiKey: "test-api-key", apiModelId })
+			expect(handler.getModel().info.summarizesTextBetweenToolCalls).toBe(expected)
+		})
+
 		it("should handle Claude Opus 5.5 model correctly", () => {
 			const handler = new AnthropicHandler({
 				apiKey: "test-api-key",
@@ -751,6 +761,7 @@ describe("AnthropicHandler", () => {
 			const model = handler.getModel()
 			expect(model.id).toBe("claude-opus-5-5")
 			expect(model.info.maxTokens).toBe(128000)
+			expect(model.info.summarizesTextBetweenToolCalls).toBe(true)
 			expect(model.info.contextWindow).toBe(1000000)
 			expect(model.info.inputPrice).toBe(4.0)
 			expect(model.info.outputPrice).toBe(20.0)

@@ -348,6 +348,7 @@ describe("Vercel AI Gateway Fetchers", () => {
 			expect(result.maxTokens).toBe(128000)
 			expect(result.contextWindow).toBe(1000000)
 			expect(result.supportsTemperature).toBe(false)
+			expect(result.summarizesTextBetweenToolCalls).toBe(true)
 		})
 
 		it("detects vision-only models", () => {

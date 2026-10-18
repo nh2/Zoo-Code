@@ -506,6 +506,7 @@ export const vertexModels = {
 		supportsReasoningBinary: true,
 		supportsMaxTokens: true,
 		supportsTemperature: false,
+		summarizesTextBetweenToolCalls: true,
 		description:
 			"Claude Opus 5.5 is Anthropic's most capable model for complex agentic coding and enterprise work.",
 	},
@@ -522,6 +523,7 @@ export const vertexModels = {
 		supportsReasoningBinary: true,
 		supportsMaxTokens: true,
 		supportsTemperature: false,
+		summarizesTextBetweenToolCalls: true,
 		description:
 			"Claude Fable 5.1 extends Fable 5 with stronger long-running agentic coding, multistep research, and document work.",
 	},
@@ -538,6 +540,7 @@ export const vertexModels = {
 		supportsReasoningBinary: true,
 		supportsMaxTokens: true,
 		supportsTemperature: false,
+		summarizesTextBetweenToolCalls: true,
 		description:
 			"Claude Fable 5 is Anthropic's most capable widely released model for the most demanding reasoning and long-horizon agentic work.",
 	},

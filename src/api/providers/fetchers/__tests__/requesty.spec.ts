@@ -149,6 +149,7 @@ describe("getRequestyModels", () => {
 		expect(opus55.supportsReasoningBudget).toBe(true)
 		expect(opus55.supportsReasoningBinary).toBe(true)
 		expect(opus55.supportsTemperature).toBe(false)
+		expect(opus55.summarizesTextBetweenToolCalls).toBe(true)
 	})
 
 	it("does not apply Fable 5 overrides to other models", async () => {

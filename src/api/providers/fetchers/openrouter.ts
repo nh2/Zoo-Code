@@ -286,6 +286,7 @@ export const parseOpenRouterModel = ({
 		modelInfo.supportsReasoningBudget = true
 		modelInfo.supportsReasoningBinary = true
 		modelInfo.supportsTemperature = false
+		modelInfo.summarizesTextBetweenToolCalls = true
 	}
 
 	// Set claude-fable-5 model to use the correct Anthropic configuration
@@ -293,6 +294,7 @@ export const parseOpenRouterModel = ({
 		modelInfo.maxTokens = anthropicModels["claude-fable-5"].maxTokens
 		modelInfo.supportsReasoningBinary = true
 		modelInfo.supportsTemperature = false
+		modelInfo.summarizesTextBetweenToolCalls = true
 	}
 
 	// Set claude-sonnet-5 model to use the correct Anthropic configuration
@@ -314,6 +316,7 @@ export const parseOpenRouterModel = ({
 		modelInfo.maxTokens = anthropicModels["claude-opus-5-5"].maxTokens
 		modelInfo.supportsReasoningBinary = true
 		modelInfo.supportsTemperature = false
+		modelInfo.summarizesTextBetweenToolCalls = true
 	}
 
 	// Ensure correct reasoning handling for Claude Haiku 4.5 on OpenRouter
