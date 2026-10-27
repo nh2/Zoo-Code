@@ -438,6 +438,7 @@ export class Task extends EventEmitter<TaskEvents> implements TaskLike {
 	fileContextTracker: FileContextTracker
 	terminalProcesses = new Map<string, RooTerminalProcess>()
 	activeToolContexts = new Map<string, ToolExecutionContext>()
+	readonly mcpExecutionAbortControllers = new Map<string, AbortController>()
 
 	// Editing
 	diffViewProvider: DiffViewProvider
@@ -2682,6 +2683,10 @@ export class Task extends EventEmitter<TaskEvents> implements TaskLike {
 		}
 	}
 
+	abortMcpExecution(executionId: string) {
+		this.mcpExecutionAbortControllers.get(executionId)?.abort()
+	}
+
 	private async getFilesReadByRooSafely(context: string): Promise<string[] | undefined> {
 		try {
 			return await this.fileContextTracker.getFilesReadByRoo()
@@ -3778,6 +3783,11 @@ export class Task extends EventEmitter<TaskEvents> implements TaskLike {
 		} catch (error) {
 			console.error("Error cancelling current request:", error)
 		}
+
+		for (const controller of this.mcpExecutionAbortControllers.values()) {
+			controller.abort()
+		}
+		this.mcpExecutionAbortControllers.clear()
 
 		// Dispose message queue and remove event listeners.
 		try {

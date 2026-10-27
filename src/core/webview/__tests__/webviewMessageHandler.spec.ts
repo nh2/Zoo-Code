@@ -84,6 +84,7 @@ import * as copilotProvider from "../../../api/providers/github-copilot"
 import { webviewMessageHandler } from "../webviewMessageHandler"
 import { registerCopilotModelBroadcast } from "../../../services/language-models/copilotModelBroadcast"
 import type { ClineProvider } from "../ClineProvider"
+import type { Task } from "../../task/Task"
 import { flushModels, getModels } from "../../../api/providers/fetchers/modelCache"
 import { getLMStudioModels } from "../../../api/providers/fetchers/lmstudio"
 import { getCommands } from "../../../services/command/commands"
@@ -2214,6 +2215,23 @@ describe("webviewMessageHandler - openTerminalProfilePicker", () => {
 	it("executes the VS Code selectDefaultShell command", async () => {
 		await webviewMessageHandler(mockClineProvider, { type: "openTerminalProfilePicker" })
 		expect(vscode.commands.executeCommand).toHaveBeenCalledWith("workbench.action.terminal.selectDefaultShell")
+	})
+})
+
+describe("webviewMessageHandler - abortMcpExecution", () => {
+	beforeEach(() => {
+		vi.clearAllMocks()
+	})
+
+	it("aborts the MCP execution with the given id on the current task", async () => {
+		const abortMcpExecution = vi.fn()
+		vi.mocked(mockClineProvider.getCurrentTask).mockReturnValue({
+			abortMcpExecution,
+		} as Partial<Task> as Task)
+
+		await webviewMessageHandler(mockClineProvider, { type: "abortMcpExecution", executionId: "42" })
+
+		expect(abortMcpExecution).toHaveBeenCalledWith("42")
 	})
 })
 

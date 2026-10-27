@@ -2253,6 +2253,7 @@ export class McpHub {
 		toolName: string,
 		toolArguments?: Record<string, unknown>,
 		source?: "global" | "project",
+		signal?: AbortSignal,
 	): Promise<McpToolCallResponse> {
 		const connection = this.findConnection(serverName, source)
 		if (!connection || connection.type !== "connected") {
@@ -2286,6 +2287,7 @@ export class McpHub {
 				CallToolResultSchema,
 				{
 					timeout,
+					signal,
 				},
 			)
 		} catch (error) {
@@ -2331,6 +2333,7 @@ export class McpHub {
 						CallToolResultSchema,
 						{
 							timeout,
+							signal,
 						},
 					)
 				} catch (retryError) {
