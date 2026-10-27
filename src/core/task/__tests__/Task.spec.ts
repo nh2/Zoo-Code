@@ -4296,6 +4296,44 @@ describe("Cline", () => {
 				// Verify cancelCurrentRequest was called
 				expect(cancelSpy).toHaveBeenCalled()
 			})
+
+			it("abortMcpExecution aborts only the matching in-flight MCP call", () => {
+				const task = new Task({
+					provider: mockProvider,
+					apiConfiguration: mockApiConfig,
+					task: "test task",
+					startTask: false,
+				})
+				const target = new AbortController()
+				const other = new AbortController()
+				task.mcpExecutionAbortControllers.set("1", target)
+				task.mcpExecutionAbortControllers.set("2", other)
+
+				task.abortMcpExecution("1")
+				task.abortMcpExecution("unknown")
+
+				expect(target.signal.aborted).toBe(true)
+				expect(other.signal.aborted).toBe(false)
+			})
+
+			it("dispose aborts every in-flight MCP call", () => {
+				const task = new Task({
+					provider: mockProvider,
+					apiConfiguration: mockApiConfig,
+					task: "test task",
+					startTask: false,
+				})
+				vi.spyOn(task.messageQueueService, "removeListener").mockImplementation(() => task.messageQueueService)
+				vi.spyOn(task.messageQueueService, "dispose").mockImplementation(() => {})
+				vi.spyOn(task, "removeAllListeners").mockImplementation(() => task)
+				const controller = new AbortController()
+				task.mcpExecutionAbortControllers.set("1", controller)
+
+				void task.dispose()
+
+				expect(controller.signal.aborted).toBe(true)
+				expect(task.mcpExecutionAbortControllers.size).toBe(0)
+			})
 			describe("abortSignal", () => {
 				it("should pass AbortController signal to condenseContext metadata when a current request exists", async () => {
 					const task = new Task({

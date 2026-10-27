@@ -869,6 +869,11 @@ export const webviewMessageHandler = async (
 				await provider.getCurrentTask()?.handleTerminalOperation(message.terminalOperation)
 			}
 			break
+		case "abortMcpExecution":
+			if (message.executionId) {
+				provider.getCurrentTask()?.abortMcpExecution(message.executionId)
+			}
+			break
 		case "clearTask":
 			// Clear task resets the current session. Delegation flows are
 			// handled via metadata; parent resumption occurs through

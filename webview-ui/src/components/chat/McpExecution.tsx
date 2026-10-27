@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState, memo } from "react"
-import { Server, ChevronDown } from "lucide-react"
+import { Server, ChevronDown, OctagonX } from "lucide-react"
 import { useEvent } from "react-use"
 import { useTranslation } from "react-i18next"
 
@@ -13,7 +13,8 @@ import {
 import { safeJsonParse } from "@roo/core"
 
 import { cn } from "@src/lib/utils"
-import { Button } from "@src/components/ui"
+import { vscode } from "@src/utils/vscode"
+import { Button, StandardTooltip } from "@src/components/ui"
 
 import CodeBlock from "../common/CodeBlock"
 import McpToolRow from "../mcp/McpToolRow"
@@ -217,6 +218,19 @@ export const McpExecution = ({
 								</div>
 								{status.status === "error" && "error" in status && status.error && (
 									<div className="whitespace-nowrap">({status.error})</div>
+								)}
+								{status.status === "started" && (
+									<StandardTooltip content={t("chat:commandExecution.abort")}>
+										<Button
+											variant="ghost"
+											size="icon"
+											aria-label={t("chat:commandExecution.abort")}
+											onClick={() =>
+												vscode.postMessage({ type: "abortMcpExecution", executionId })
+											}>
+											<OctagonX className="size-4" />
+										</Button>
+									</StandardTooltip>
 								)}
 							</div>
 						)}

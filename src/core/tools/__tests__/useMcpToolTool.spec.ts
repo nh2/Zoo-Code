@@ -73,6 +73,7 @@ describe("useMcpToolTool", () => {
 			ask: vi.fn(),
 			lastMessageTs: 123456789,
 			providerRef: mockProviderRef,
+			mcpExecutionAbortControllers: new Map(),
 		}
 	})
 
@@ -298,7 +299,13 @@ describe("useMcpToolTool", () => {
 
 			expect(mockTask.consecutiveMistakeCount).toBe(0)
 			expect(mockTask.recordToolError).not.toHaveBeenCalled()
-			expect(callToolMock).toHaveBeenCalledWith("test_server", "test_tool", { headless: true })
+			expect(callToolMock).toHaveBeenCalledWith(
+				"test_server",
+				"test_tool",
+				{ headless: true },
+				undefined, // server source: unspecified, so McpHub prefers project over global
+				expect.any(AbortSignal),
+			)
 			expect(mockTask.say).toHaveBeenCalledWith("mcp_server_request_started")
 			expect(mockTask.say).toHaveBeenCalledWith("mcp_server_response", "Browser session started", [])
 		})
@@ -687,7 +694,13 @@ describe("useMcpToolTool", () => {
 			expect(mockTask.say).toHaveBeenCalledWith("mcp_server_request_started")
 
 			// The original tool name (with hyphens) should be passed to callTool
-			expect(callToolMock).toHaveBeenCalledWith("test-server", "get-user-profile", {})
+			expect(callToolMock).toHaveBeenCalledWith(
+				"test-server",
+				"get-user-profile",
+				{},
+				undefined, // server source: unspecified, so McpHub prefers project over global
+				expect.any(AbortSignal),
+			)
 		})
 	})
 
@@ -918,6 +931,106 @@ describe("useMcpToolTool", () => {
 				"data:image/png;base64,image2data",
 			])
 			expect(mockPushToolResult).toHaveBeenCalledWith(expect.stringContaining("with 2 image(s)"))
+		})
+	})
+
+	describe("abort", () => {
+		const block: ToolUse<"use_mcp_tool"> = {
+			type: "tool_use",
+			name: "use_mcp_tool",
+			params: { server_name: "test_server", tool_name: "test_tool", arguments: "{}" },
+			nativeArgs: { server_name: "test_server", tool_name: "test_tool", arguments: {} },
+			partial: false,
+		}
+
+		function setupHangingCallTool() {
+			const postMessageToWebview = vi.fn()
+			const callToolMock = vi.fn(
+				(_server: string, _tool: string, _args: unknown, _source: unknown, signal: AbortSignal) =>
+					new Promise((_resolve, reject) => {
+						signal.addEventListener("abort", () => reject(new Error("AbortError")), { once: true })
+					}),
+			)
+			mockProviderRef.deref.mockReturnValue({
+				getMcpHub: () => ({
+					callTool: callToolMock,
+					getAllServers: vi
+						.fn()
+						.mockReturnValue([{ name: "test_server", tools: [{ name: "test_tool", description: "d" }] }]),
+				}),
+				postMessageToWebview,
+			})
+			mockAskApproval.mockResolvedValue(true)
+			return { callToolMock, postMessageToWebview }
+		}
+
+		it("aborts the in-flight call registered under its executionId and reports it", async () => {
+			const { callToolMock, postMessageToWebview } = setupHangingCallTool()
+			const controllers = mockTask.mcpExecutionAbortControllers!
+
+			const run = useMcpToolTool.handle(mockTask as Task, block, {
+				askApproval: mockAskApproval,
+				handleError: mockHandleError,
+				pushToolResult: mockPushToolResult,
+			})
+
+			await vi.waitFor(() => expect(callToolMock).toHaveBeenCalled())
+			expect(controllers.has("123456789")).toBe(true)
+
+			controllers.get("123456789")!.abort()
+			await run
+
+			expect(controllers.size).toBe(0)
+			expect(mockHandleError).not.toHaveBeenCalled()
+			expect(mockTask.say).toHaveBeenCalledWith("mcp_server_response", "(Aborted by user)")
+			expect(mockPushToolResult).toHaveBeenCalledWith(expect.stringContaining("Tool error:"))
+			expect(postMessageToWebview).toHaveBeenCalledWith({
+				type: "mcpExecutionStatus",
+				text: JSON.stringify({ executionId: "123456789", status: "error", error: "Aborted by user" }),
+			})
+		})
+
+		it("keys the execution by the approval row's ts, not the message before it", async () => {
+			const { callToolMock, postMessageToWebview } = setupHangingCallTool()
+			mockAskApproval.mockImplementation(async () => {
+				mockTask.lastMessageTs = 987654321
+				return true
+			})
+
+			const run = useMcpToolTool.handle(mockTask as Task, block, {
+				askApproval: mockAskApproval,
+				handleError: mockHandleError,
+				pushToolResult: mockPushToolResult,
+			})
+
+			await vi.waitFor(() => expect(callToolMock).toHaveBeenCalled())
+			expect(postMessageToWebview).toHaveBeenCalledWith({
+				type: "mcpExecutionStatus",
+				text: JSON.stringify({
+					executionId: "987654321",
+					status: "started",
+					serverName: "test_server",
+					toolName: "test_tool",
+				}),
+			})
+			expect([...mockTask.mcpExecutionAbortControllers!.keys()]).toEqual(["987654321"])
+
+			mockTask.mcpExecutionAbortControllers!.get("987654321")!.abort()
+			await run
+		})
+
+		it("still routes non-abort failures to handleError and unregisters the controller", async () => {
+			const { callToolMock } = setupHangingCallTool()
+			callToolMock.mockRejectedValueOnce(new Error("boom"))
+
+			await useMcpToolTool.handle(mockTask as Task, block, {
+				askApproval: mockAskApproval,
+				handleError: mockHandleError,
+				pushToolResult: mockPushToolResult,
+			})
+
+			expect(mockHandleError).toHaveBeenCalledWith("executing MCP tool", expect.any(Error))
+			expect(mockTask.mcpExecutionAbortControllers!.size).toBe(0)
 		})
 	})
 })

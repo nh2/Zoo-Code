@@ -1746,6 +1746,32 @@ describe("McpHub", () => {
 				)
 			})
 
+			it("should forward the abort signal to the tool call request", async () => {
+				const request = vi.fn().mockResolvedValue({ content: [] })
+				const mockConnection: ConnectedMcpConnection = {
+					type: "connected",
+					server: {
+						name: "test-server",
+						config: JSON.stringify({ type: "stdio", command: "test" }),
+						status: "connected",
+					},
+					client: { request } as Partial<
+						ConnectedMcpConnection["client"]
+					> as ConnectedMcpConnection["client"],
+					transport: {} as ConnectedMcpConnection["transport"],
+				}
+
+				mcpHub.connections = [mockConnection]
+				const controller = new AbortController()
+				await mcpHub.callTool("test-server", "test-tool", {}, undefined, controller.signal)
+
+				expect(request).toHaveBeenCalledWith(
+					expect.anything(),
+					expect.anything(),
+					expect.objectContaining({ signal: controller.signal }),
+				)
+			})
+
 			it("should apply configured timeout to tool calls", async () => {
 				const mockConnection: ConnectedMcpConnection = {
 					type: "connected",

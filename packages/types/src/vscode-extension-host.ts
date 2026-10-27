@@ -482,6 +482,7 @@ export interface WebviewMessage {
 		| "newTask"
 		| "askResponse"
 		| "terminalOperation"
+		| "abortMcpExecution"
 		| "clearTask"
 		| "didShowAnnouncement"
 		| "selectImages"
@@ -703,6 +704,7 @@ export interface WebviewMessage {
 	themeFixture?: WebviewThemeFixture
 	ids?: string[]
 	terminalOperation?: "continue" | "abort"
+	executionId?: string // For abortMcpExecution
 	messageTs?: number
 	messageId?: string
 	restoreCheckpoint?: boolean

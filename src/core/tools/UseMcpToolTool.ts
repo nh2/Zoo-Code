@@ -1,6 +1,7 @@
 import type { ClineAskUseMcpServer, McpExecutionStatus, McpResourceLink } from "@roo-code/types"
 
 import { Task } from "../task/Task"
+import type { McpHub } from "../../services/mcp/McpHub"
 import { formatResponse } from "../prompts/responses"
 import { t } from "../../i18n"
 import type { ToolUse } from "../../shared/tools"
@@ -90,12 +91,14 @@ export class UseMcpToolTool extends BaseTool<"use_mcp_tool"> {
 				arguments: params.arguments ? JSON.stringify(params.arguments) : undefined,
 			} satisfies ClineAskUseMcpServer)
 
-			const executionId = task.lastMessageTs?.toString() ?? Date.now().toString()
 			const didApprove = await askApproval("use_mcp_server", completeMessage)
 
 			if (!didApprove) {
 				return
 			}
+
+			// Read after approval: the ask may have created a new row, and the webview keys status by that row's ts.
+			const executionId = task.lastMessageTs?.toString() ?? Date.now().toString()
 
 			// Execute the tool and process results
 			await this.executeToolAndProcessResult(
@@ -351,7 +354,29 @@ export class UseMcpToolTool extends BaseTool<"use_mcp_tool"> {
 			toolName,
 		})
 
-		const toolResult = await task.providerRef.deref()?.getMcpHub()?.callTool(serverName, toolName, parsedArguments)
+		const abortController = new AbortController()
+		task.mcpExecutionAbortControllers.set(executionId, abortController)
+
+		// Unspecified source: McpHub prefers a project server over a global one with the same name.
+		const serverSource: "global" | "project" | undefined = undefined
+
+		let toolResult: Awaited<ReturnType<McpHub["callTool"]>> | undefined
+		try {
+			toolResult = await task.providerRef
+				.deref()
+				?.getMcpHub()
+				?.callTool(serverName, toolName, parsedArguments, serverSource, abortController.signal)
+		} catch (error) {
+			if (!abortController.signal.aborted) {
+				throw error
+			}
+			await this.sendExecutionStatus(task, { executionId, status: "error", error: "Aborted by user" })
+			await task.say("mcp_server_response", "(Aborted by user)")
+			pushToolResult(formatResponse.toolError("The user aborted this MCP tool call before it completed."))
+			return
+		} finally {
+			task.mcpExecutionAbortControllers.delete(executionId)
+		}
 
 		let toolResultPretty = "(No response)"
 		let images: string[] = []
