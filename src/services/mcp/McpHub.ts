@@ -2412,6 +2412,11 @@ export class McpHub {
 			targetList.splice(toolIndex, 1)
 		}
 
+		// Stable ordering keeps diffs of version-controlled MCP configs minimal.
+		if (listName === "alwaysAllow") {
+			targetList.sort()
+		}
+
 		// Set flag to prevent file watcher from triggering server restart
 		if (this.flagResetTimer) {
 			clearTimeout(this.flagResetTimer)

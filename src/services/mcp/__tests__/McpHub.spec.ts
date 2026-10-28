@@ -1148,6 +1148,46 @@ describe("McpHub", () => {
 			expect(writtenConfig.mcpServers["test-server"].alwaysAllow).toContain("new-tool")
 		})
 
+		it.each([
+			{ toolName: "b-tool", shouldAllow: true, expected: ["a-tool", "b-tool", "c-tool", "d-tool"] },
+			{ toolName: "c-tool", shouldAllow: false, expected: ["a-tool", "d-tool"] },
+		])(
+			"should keep alwaysAllow sorted when toggling $toolName to $shouldAllow",
+			async ({ toolName, shouldAllow, expected }) => {
+				const mockConfig = {
+					mcpServers: {
+						"test-server": {
+							type: "stdio",
+							command: "node",
+							args: ["test.js"],
+							alwaysAllow: ["d-tool", "a-tool", "c-tool"],
+						},
+					},
+				}
+
+				vi.mocked(fs.readFile).mockResolvedValueOnce(JSON.stringify(mockConfig))
+
+				const mockConnection: DisconnectedMcpConnection = {
+					type: "disconnected",
+					server: {
+						name: "test-server",
+						config: JSON.stringify(mockConfig.mcpServers["test-server"]),
+						status: "disconnected",
+						source: "global",
+					},
+					client: null,
+					transport: null,
+				}
+				mcpHub.connections = [mockConnection]
+
+				await mcpHub.toggleToolAlwaysAllow("test-server", "global", toolName, shouldAllow)
+
+				const writeCalls = vi.mocked(fs.writeFile).mock.calls
+				const writtenConfig = JSON.parse(writeCalls[writeCalls.length - 1][1] as string)
+				expect(writtenConfig.mcpServers["test-server"].alwaysAllow).toEqual(expected)
+			},
+		)
+
 		it("should mark all tools as always allowed when wildcard is present", async () => {
 			const mockConfig = {
 				mcpServers: {
