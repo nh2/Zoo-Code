@@ -41,6 +41,8 @@ const HistoryView = ({ onDone }: HistoryViewProps) => {
 		setLastNonRelevantSort,
 		showAllWorkspaces,
 		setShowAllWorkspaces,
+		searchConversations,
+		conversationSearchStatus,
 	} = useTaskSearch()
 	const { t } = useAppTranslation()
 
@@ -133,29 +135,61 @@ const HistoryView = ({ onDone }: HistoryViewProps) => {
 					</StandardTooltip>
 				</div>
 				<div className="flex flex-col gap-2">
-					<VSCodeTextField
-						className="w-full"
-						placeholder={t("history:searchPlaceholder")}
-						value={searchQuery}
-						data-testid="history-search-input"
-						onInput={(e) => {
-							const newValue = (e.target as HTMLInputElement)?.value
-							setSearchQuery(newValue)
-							if (newValue && !searchQuery && sortOption !== "mostRelevant") {
-								setLastNonRelevantSort(sortOption)
-								setSortOption("mostRelevant")
-							}
-						}}>
-						<div slot="start" className="codicon codicon-search mt-0.5 opacity-80 text-sm!" />
-						{searchQuery && (
-							<div
-								className="input-icon-button codicon codicon-close flex justify-center items-center h-full"
-								aria-label="Clear search"
-								onClick={() => setSearchQuery("")}
-								slot="end"
-							/>
-						)}
-					</VSCodeTextField>
+					<div className="flex items-center gap-2">
+						<VSCodeTextField
+							className="flex-1 min-w-0"
+							placeholder={t("history:searchPlaceholder")}
+							value={searchQuery}
+							data-testid="history-search-input"
+							onInput={(e) => {
+								const newValue = (e.target as HTMLInputElement)?.value
+								setSearchQuery(newValue)
+								if (newValue && !searchQuery && sortOption !== "mostRelevant") {
+									setLastNonRelevantSort(sortOption)
+									setSortOption("mostRelevant")
+								}
+							}}>
+							<div slot="start" className="codicon codicon-search mt-0.5 opacity-80 text-sm!" />
+							{searchQuery && (
+								<div
+									className="input-icon-button codicon codicon-close flex justify-center items-center h-full"
+									aria-label="Clear search"
+									onClick={() => setSearchQuery("")}
+									slot="end"
+								/>
+							)}
+						</VSCodeTextField>
+						<StandardTooltip content={t("history:searchConversationsTooltip")}>
+							{/* Wrapper keeps the tooltip working while the button is disabled */}
+							<span className="shrink-0">
+								<Button
+									variant="secondary"
+									disabled={!searchQuery.trim() || conversationSearchStatus === "loading"}
+									onClick={searchConversations}
+									aria-label={t("history:searchConversations")}
+									data-testid="search-conversations-button">
+									<span
+										className={`codicon ${conversationSearchStatus === "loading" ? "codicon-loading codicon-modifier-spin" : "codicon-search-fuzzy"}`}
+									/>
+									<span className="hidden min-[400px]:inline">
+										{t("history:searchConversations")}
+									</span>
+								</Button>
+							</span>
+						</StandardTooltip>
+					</div>
+					{conversationSearchStatus !== "idle" && (
+						<div
+							className="text-vscode-descriptionForeground text-xs"
+							data-testid="conversation-search-status">
+							{conversationSearchStatus === "loading"
+								? t("history:searchingConversations")
+								: t("history:conversationSearchResults", {
+										count: tasks.length,
+										query: searchQuery.trim(),
+									})}
+						</div>
+					)}
 					<div className="grid grid-cols-1 min-[400px]:grid-cols-2 gap-2">
 						<Select
 							value={showAllWorkspaces ? "all" : "current"}
