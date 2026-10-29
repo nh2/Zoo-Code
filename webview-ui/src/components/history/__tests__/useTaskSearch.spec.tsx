@@ -1,6 +1,6 @@
 import { renderHook, act } from "@/utils/test-utils"
 
-import type { HistoryItem } from "@roo-code/types"
+import type { HistoryItem, TaskConversationMatch } from "@roo-code/types"
 
 import { useTaskSearch } from "../useTaskSearch"
 
@@ -12,7 +12,12 @@ vi.mock("@/utils/highlight", () => ({
 	highlightFzfMatch: vi.fn((text) => `<mark>${text}</mark>`),
 }))
 
+vi.mock("@/utils/vscode", () => ({
+	vscode: { postMessage: vi.fn() },
+}))
+
 import { useExtensionState } from "@/context/ExtensionStateContext"
+import { vscode } from "@/utils/vscode"
 
 const mockUseExtensionState = useExtensionState as ReturnType<typeof vi.fn>
 
@@ -283,5 +288,97 @@ describe("useTaskSearch", () => {
 		// When searching, mostRelevant should preserve fzf order
 		// When not searching, it should fall back to newest
 		expect(result.current.sortOption).toBe("mostRelevant")
+	})
+
+	describe("full conversation search", () => {
+		const postResults = (requestId: string | undefined, taskConversationMatches: TaskConversationMatch[]) => {
+			act(() => {
+				window.dispatchEvent(
+					new MessageEvent("message", {
+						data: { type: "taskConversationSearchResults", requestId, taskConversationMatches },
+					}),
+				)
+			})
+		}
+
+		const lastRequest = () => vi.mocked(vscode.postMessage).mock.lastCall![0]
+
+		const match = (taskId: string, matchCount: number): TaskConversationMatch => ({
+			taskId,
+			matchCount,
+			snippet: "see issues/1985 here",
+			snippetMatchStart: 4,
+			snippetMatchLength: 11,
+		})
+
+		it("does nothing for a blank query", () => {
+			const { result } = renderHook(() => useTaskSearch())
+
+			act(() => result.current.searchConversations())
+
+			expect(vscode.postMessage).not.toHaveBeenCalled()
+			expect(result.current.conversationSearchStatus).toBe("idle")
+		})
+
+		it("requests a search over the visible tasks and shows only matching tasks", () => {
+			const { result } = renderHook(() => useTaskSearch())
+
+			act(() => result.current.setSearchQuery("  issues/1985 "))
+			act(() => result.current.searchConversations())
+
+			expect(result.current.conversationSearchStatus).toBe("loading")
+			expect(lastRequest()).toEqual({
+				type: "searchTaskConversations",
+				query: "issues/1985",
+				ids: ["task-1", "task-2"],
+				requestId: expect.any(String),
+			})
+
+			postResults(lastRequest().requestId, [match("task-1", 1), match("task-3", 1)])
+
+			expect(result.current.conversationSearchStatus).toBe("done")
+			// task-3 is outside the current workspace and must not appear
+			expect(result.current.tasks.map((t) => t.id)).toEqual(["task-1"])
+			expect(result.current.tasks[0].conversationSnippet).toBe("<mark>see issues/1985 here</mark>")
+			expect(result.current.tasks[0].highlight).toBeUndefined()
+		})
+
+		it("ignores results for a stale request", () => {
+			const { result } = renderHook(() => useTaskSearch())
+
+			act(() => result.current.setSearchQuery("issues"))
+			act(() => result.current.searchConversations())
+
+			postResults("some-other-request", [match("task-1", 1)])
+
+			expect(result.current.conversationSearchStatus).toBe("loading")
+		})
+
+		it("orders by match count under Most Relevant and by date under Newest", () => {
+			const { result } = renderHook(() => useTaskSearch())
+
+			act(() => result.current.setSearchQuery("issues"))
+			act(() => result.current.searchConversations())
+			postResults(lastRequest().requestId, [match("task-2", 1), match("task-1", 5)])
+
+			act(() => result.current.setSortOption("mostRelevant"))
+			expect(result.current.tasks.map((t) => t.id)).toEqual(["task-1", "task-2"])
+
+			act(() => result.current.setSortOption("newest"))
+			expect(result.current.tasks.map((t) => t.id)).toEqual(["task-2", "task-1"])
+		})
+
+		it("falls back to the normal search when the query changes", () => {
+			const { result } = renderHook(() => useTaskSearch())
+
+			act(() => result.current.setSearchQuery("issues"))
+			act(() => result.current.searchConversations())
+			postResults(lastRequest().requestId, [match("task-2", 1)])
+
+			act(() => result.current.setSearchQuery("React"))
+
+			expect(result.current.conversationSearchStatus).toBe("idle")
+			expect(result.current.tasks.map((t) => t.id)).toEqual(["task-1"])
+		})
 	})
 })

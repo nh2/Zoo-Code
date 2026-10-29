@@ -52,3 +52,16 @@ export const historyItemSchema = z.object({
 })
 
 export type HistoryItem = z.infer<typeof historyItemSchema>
+
+/**
+ * A task whose full conversation (not just the initial prompt) contains a search query.
+ */
+export interface TaskConversationMatch {
+	taskId: string
+	matchCount: number
+	/** Excerpt around the first match */
+	snippet: string
+	/** UTF-16 offset of the first match within `snippet` */
+	snippetMatchStart: number
+	snippetMatchLength: number
+}

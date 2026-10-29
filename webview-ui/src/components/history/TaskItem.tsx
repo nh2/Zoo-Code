@@ -5,6 +5,7 @@ import type { DisplayHistoryItem } from "./types"
 import { vscode } from "@/utils/vscode"
 import { cn } from "@/lib/utils"
 import { Checkbox } from "@/components/ui/checkbox"
+import { useAppTranslation } from "@/i18n/TranslationContext"
 
 import TaskItemFooter from "./TaskItemFooter"
 import { StandardTooltip } from "../ui"
@@ -40,6 +41,7 @@ const TaskItem = ({
 		}
 	}
 
+	const { t } = useAppTranslation()
 	const isCompact = variant === "compact"
 
 	return (
@@ -101,6 +103,21 @@ const TaskItem = ({
 						{/* Arrow icon that appears on hover */}
 						<ArrowRight className="size-4 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity" />
 					</div>
+
+					{item.conversationSnippet && (
+						<div className="mt-1 border-l-2 border-vscode-panel-border pl-2 text-sm text-vscode-descriptionForeground">
+							<div
+								className="overflow-hidden whitespace-pre-wrap break-words line-clamp-3"
+								data-testid="task-conversation-snippet"
+								dangerouslySetInnerHTML={{ __html: item.conversationSnippet }}
+							/>
+							{(item.conversationMatchCount ?? 0) > 1 && (
+								<div className="text-xs opacity-80">
+									{t("history:conversationMatchCount", { count: item.conversationMatchCount })}
+								</div>
+							)}
+						</div>
+					)}
 
 					{showWorkspace && item.workspace && (
 						<div className="flex items-center font-mono gap-1 text-vscode-descriptionForeground text-xs mt-1">

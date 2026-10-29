@@ -6,6 +6,9 @@ import type { HistoryItem } from "@roo-code/types"
 export interface DisplayHistoryItem extends HistoryItem {
 	/** HTML string with search match highlighting */
 	highlight?: string
+	/** HTML excerpt around the first full-conversation search match */
+	conversationSnippet?: string
+	conversationMatchCount?: number
 	/** Whether this task is a subtask (has a parent in the current task list) */
 	isSubtask?: boolean
 }

@@ -95,6 +95,29 @@ describe("TaskItem", () => {
 		expect(screen.getByText(/ago/)).toBeInTheDocument()
 	})
 
+	it("shows the conversation snippet and match count from a full conversation search", () => {
+		render(
+			<TaskItem
+				item={{
+					...mockTask,
+					conversationSnippet: 'see <span class="history-item-highlight">issue</span>',
+					conversationMatchCount: 3,
+				}}
+				variant="full"
+			/>,
+		)
+
+		expect(screen.getByText("Test task")).toBeInTheDocument()
+		expect(screen.getByTestId("task-conversation-snippet")).toHaveTextContent("see issue")
+		expect(screen.getByText("history:conversationMatchCount")).toBeInTheDocument()
+	})
+
+	it("omits the conversation snippet for normal search results", () => {
+		render(<TaskItem item={mockTask} variant="full" />)
+
+		expect(screen.queryByTestId("task-conversation-snippet")).not.toBeInTheDocument()
+	})
+
 	it("applies hover effect class", () => {
 		render(
 			<TaskItem
