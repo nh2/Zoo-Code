@@ -100,6 +100,10 @@ export interface ApiStreamUsageChunk {
 	cacheReadTokens?: number
 	reasoningTokens?: number
 	totalCost?: number
+	/** Extra cost of re-writing a prefix that was already cached (Bedrock). */
+	cacheInvalidationCost?: number
+	/** Epoch ms at which the prompt cache refreshed by this request expires (Bedrock). */
+	cacheExpiresAt?: number
 }
 
 export interface ApiStreamGroundingChunk {

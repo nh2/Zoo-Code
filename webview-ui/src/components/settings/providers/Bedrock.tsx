@@ -222,6 +222,29 @@ export const Bedrock = ({ apiConfiguration, setApiConfigurationField, selectedMo
 					<div className="text-sm text-vscode-descriptionForeground ml-6 mt-1">
 						{t("settings:providers.cacheUsageNote")}
 					</div>
+					{(apiConfiguration.awsUsePromptCache ?? true) && (
+						<div>
+							<label className="block font-medium mb-1">
+								{t("settings:providers.awsPromptCacheTtl")}
+							</label>
+							<Select
+								value={apiConfiguration.awsPromptCacheTtl ?? "5m"}
+								onValueChange={(value) =>
+									setApiConfigurationField("awsPromptCacheTtl", value as "5m" | "1h")
+								}>
+								<SelectTrigger className="w-full">
+									<SelectValue />
+								</SelectTrigger>
+								<SelectContent>
+									<SelectItem value="5m">{t("settings:providers.awsPromptCacheTtl5m")}</SelectItem>
+									<SelectItem value="1h">{t("settings:providers.awsPromptCacheTtl1h")}</SelectItem>
+								</SelectContent>
+							</Select>
+							<div className="text-sm text-vscode-descriptionForeground mt-1">
+								{t("settings:providers.awsPromptCacheTtlDescription")}
+							</div>
+						</div>
+					)}
 				</>
 			)}
 			{supports1MContextBeta && (

@@ -51,7 +51,8 @@ export abstract class CacheStrategy {
 	 * Create a cache point content block
 	 */
 	protected createCachePoint(): ContentBlock {
-		return { cachePoint: { type: "default" } } as unknown as ContentBlock
+		const cachePoint = this.config.cacheTtl === "1h" ? { type: "default", ttl: "1h" } : { type: "default" }
+		return { cachePoint } as unknown as ContentBlock
 	}
 
 	/**

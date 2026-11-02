@@ -21,6 +21,7 @@ export const CHAT_FONT_SIZE_DEFAULT = 13
 
 interface UISettingsProps extends HTMLAttributes<HTMLDivElement> {
 	reasoningBlockCollapsed: boolean
+	showCacheCountdown?: boolean
 	enterBehavior: "send" | "newline"
 	chatFontSize?: number
 	autoCloseZooOpenedFiles?: boolean
@@ -31,6 +32,7 @@ interface UISettingsProps extends HTMLAttributes<HTMLDivElement> {
 
 export const UISettings = ({
 	reasoningBlockCollapsed,
+	showCacheCountdown = true,
 	enterBehavior,
 	chatFontSize,
 	autoCloseZooOpenedFiles,
@@ -102,6 +104,24 @@ export const UISettings = ({
 							</VSCodeCheckbox>
 							<div className="text-vscode-descriptionForeground text-sm ml-5 mt-1">
 								{t("settings:ui.collapseThinking.description")}
+							</div>
+						</div>
+					</SearchableSetting>
+
+					{/* Cache Countdown Setting */}
+					<SearchableSetting
+						settingId="ui-show-cache-countdown"
+						section="ui"
+						label={t("settings:ui.showCacheCountdown.label")}>
+						<div className="flex flex-col gap-1">
+							<VSCodeCheckbox
+								checked={showCacheCountdown}
+								onChange={(e: any) => setCachedStateField("showCacheCountdown", e.target.checked)}
+								data-testid="show-cache-countdown-checkbox">
+								<span className="font-medium">{t("settings:ui.showCacheCountdown.label")}</span>
+							</VSCodeCheckbox>
+							<div className="text-vscode-descriptionForeground text-sm ml-5 mt-1">
+								{t("settings:ui.showCacheCountdown.description")}
 							</div>
 						</div>
 					</SearchableSetting>

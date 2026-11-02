@@ -1678,6 +1678,8 @@ const ChatViewComponent: React.ForwardRefRenderFunction<ChatViewRef, ChatViewPro
 						tokensOut={apiMetrics.totalTokensOut}
 						cacheWrites={apiMetrics.totalCacheWrites}
 						cacheReads={apiMetrics.totalCacheReads}
+						cacheInvalidationCost={apiMetrics.totalCacheInvalidationCost}
+						cacheExpiresAt={apiMetrics.cacheExpiresAt}
 						totalCost={apiMetrics.totalCost}
 						aggregatedCost={currentTaskAggregatedCosts?.totalCost}
 						hasSubtasks={(currentTaskAggregatedCosts?.childrenCost ?? 0) > 0}

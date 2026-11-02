@@ -21,6 +21,7 @@ export const bedrockProviderDefinition = createProviderDefinition({
 		awsUseCrossRegionInference: z.boolean().optional(),
 		awsUseGlobalInference: z.boolean().optional(), // Enable Global Inference profile routing when supported
 		awsUsePromptCache: z.boolean().optional(),
+		awsPromptCacheTtl: z.enum(["5m", "1h"]).optional(), // Prompt cache lifetime; defaults to 5m
 		awsProfile: z.string().optional(),
 		awsUseProfile: z.boolean().optional(),
 		awsApiKey: z.string().optional(),

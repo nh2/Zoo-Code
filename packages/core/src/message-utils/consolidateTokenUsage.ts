@@ -5,6 +5,8 @@ export type ParsedApiReqStartedTextType = {
 	tokensOut: number
 	cacheWrites: number
 	cacheReads: number
+	cacheInvalidationCost?: number
+	cacheExpiresAt?: number
 	cost?: number // Only present if consolidateApiRequests has been called
 	apiProtocol?: "anthropic" | "openai"
 }
@@ -41,7 +43,8 @@ export function consolidateTokenUsage(messages: ClineMessage[]): TokenUsage {
 		if (message.type === "say" && message.say === "api_req_started" && message.text) {
 			try {
 				const parsedText: ParsedApiReqStartedTextType = JSON.parse(message.text)
-				const { tokensIn, tokensOut, cacheWrites, cacheReads, cost } = parsedText
+				const { tokensIn, tokensOut, cacheWrites, cacheReads, cost, cacheInvalidationCost, cacheExpiresAt } =
+					parsedText
 
 				if (typeof tokensIn === "number") {
 					result.totalTokensIn += tokensIn
@@ -61,6 +64,14 @@ export function consolidateTokenUsage(messages: ClineMessage[]): TokenUsage {
 
 				if (typeof cost === "number") {
 					result.totalCost += cost
+				}
+
+				if (typeof cacheInvalidationCost === "number") {
+					result.totalCacheInvalidationCost = (result.totalCacheInvalidationCost ?? 0) + cacheInvalidationCost
+				}
+
+				if (typeof cacheExpiresAt === "number") {
+					result.cacheExpiresAt = cacheExpiresAt
 				}
 			} catch (error) {
 				console.error("Error parsing JSON:", error)
@@ -118,6 +129,8 @@ export function hasTokenUsageChanged(current: TokenUsage, snapshot?: TokenUsage)
 		"totalTokensOut",
 		"totalCacheWrites",
 		"totalCacheReads",
+		"totalCacheInvalidationCost",
+		"cacheExpiresAt",
 		"totalCost",
 		"contextTokens",
 	]

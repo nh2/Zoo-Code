@@ -235,7 +235,14 @@ vi.mock("../SlashCommandsSettings", () => ({
 	SlashCommandsSettings: vi.fn(() => <div>SlashCommandsSettings</div>),
 }))
 vi.mock("../UISettings", () => ({
-	UISettings: vi.fn(() => <div>UISettings</div>),
+	UISettings: vi.fn(({ showCacheCountdown, setCachedStateField }: any) => (
+		<button
+			data-testid="toggle-cache-countdown"
+			data-checked={String(showCacheCountdown)}
+			onClick={() => setCachedStateField("showCacheCountdown", !showCacheCountdown)}>
+			UISettings
+		</button>
+	)),
 }))
 vi.mock("../SectionHeader", () => ({
 	SectionHeader: ({ children }: any) => <div>{children}</div>,
@@ -316,6 +323,7 @@ describe("SettingsView - Unsaved Changes Detection", () => {
 		openRouterImageApiKey: undefined,
 		openRouterImageGenerationSelectedModel: undefined,
 		reasoningBlockCollapsed: true,
+		showCacheCountdown: true,
 	}
 
 	beforeEach(() => {
@@ -837,5 +845,24 @@ describe("SettingsView - Unsaved Changes Detection", () => {
 		await waitFor(() => expect(screen.getByTestId("cached-ionet-key")).toHaveValue("saved-key"))
 		expect(onDone).toHaveBeenCalledOnce()
 		expect(postMessage).not.toHaveBeenCalledWith(expect.objectContaining({ type: "upsertApiConfiguration" }))
+	})
+
+	it("saves showCacheCountdown=false from the UI tab", async () => {
+		renderWithExtensionState(<SettingsView onDone={vi.fn()} targetSection="ui" />, { queryClient })
+
+		const toggle = await screen.findByTestId("toggle-cache-countdown")
+		expect(toggle).toHaveAttribute("data-checked", "true")
+		fireEvent.click(toggle)
+		await waitFor(() =>
+			expect(screen.getByTestId("toggle-cache-countdown")).toHaveAttribute("data-checked", "false"),
+		)
+
+		fireEvent.click(screen.getByTestId("save-button"))
+		expect(postMessage).toHaveBeenCalledWith(
+			expect.objectContaining({
+				type: "updateSettings",
+				updatedSettings: expect.objectContaining({ showCacheCountdown: false }),
+			}),
+		)
 	})
 })

@@ -1485,6 +1485,31 @@ describe("ClineProvider", () => {
 		expect(postMessageSpy.mock.calls[0]?.[0].state).not.toHaveProperty("taskHistory")
 	})
 
+	test.each([true, false])(
+		"updateSettings persists showCacheCountdown=%s and posts it to the webview",
+		async (value) => {
+			await provider.resolveWebviewView(mockWebviewView)
+			const messageHandler = vi.mocked(mockWebviewView.webview.onDidReceiveMessage).mock.calls[0][0] as (
+				message: unknown,
+			) => Promise<void>
+
+			await messageHandler({ type: "updateSettings", updatedSettings: { showCacheCountdown: value } })
+
+			expect(mockContext.globalState.update).toHaveBeenCalledWith("showCacheCountdown", value)
+			expect((await provider.getState()).showCacheCountdown).toBe(value)
+			expect((await provider.getStateToPostToWebview()).showCacheCountdown).toBe(value)
+			const posted = (mockPostMessage.mock.calls as [{ type?: string; state?: ExtensionState }][])
+				.map(([m]) => m)
+				.filter((m) => m?.type === "state")
+			expect(posted.at(-1)?.state?.showCacheCountdown).toBe(value)
+		},
+	)
+
+	test("showCacheCountdown defaults to true when unset", async () => {
+		const state = await provider.getStateToPostToWebview({ includeTaskHistory: false })
+		expect(state.showCacheCountdown).toBe(true)
+	})
+
 	test("getStateToPostToWebview computes task history once after its base state resolves", async () => {
 		const historyItem = {
 			id: "history-task",

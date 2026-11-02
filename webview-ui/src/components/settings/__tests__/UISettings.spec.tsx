@@ -93,6 +93,22 @@ describe("UISettings", () => {
 		})
 	})
 
+	describe("cache countdown checkbox", () => {
+		it.each([
+			[true, true],
+			[false, false],
+		])("reflects showCacheCountdown=%s and saves the toggled value", (initial, checked) => {
+			const setCachedStateField = vi.fn()
+			const { getByTestId } = render(
+				<UISettings {...defaultProps} showCacheCountdown={initial} setCachedStateField={setCachedStateField} />,
+			)
+			const checkbox = getByTestId("show-cache-countdown-checkbox") as HTMLInputElement
+			expect(checkbox.checked).toBe(checked)
+			fireEvent.click(checkbox)
+			expect(setCachedStateField).toHaveBeenCalledWith("showCacheCountdown", !checked)
+		})
+	})
+
 	describe("auto-close Zoo-opened files checkboxes", () => {
 		it("renders all three auto-close checkboxes", () => {
 			const { getByTestId } = render(

@@ -224,6 +224,10 @@
 		"footer": "Create your own skills with the Skill Writer mode, available in the <MarketplaceLink>Modes Marketplace</MarketplaceLink>."
 	},
 	"ui": {
+		"showCacheCountdown": {
+			"label": "Show prompt cache countdown",
+			"description": "Show when the prompt cache expires next to the task cost in the collapsed task header (Bedrock)."
+		},
 		"collapseThinking": {
 			"label": "Collapse Thinking messages by default",
 			"description": "When enabled, thinking blocks will be collapsed by default until you interact with them"
@@ -670,6 +674,10 @@
 		},
 		"enablePromptCaching": "Enable prompt caching",
 		"enablePromptCachingTitle": "Enable prompt caching to improve performance and reduce costs for supported models.",
+		"awsPromptCacheTtl": "Prompt cache duration",
+		"awsPromptCacheTtl5m": "5 minutes (cache writes cost 1.25× input price)",
+		"awsPromptCacheTtl1h": "1 hour (cache writes cost 2× input price)",
+		"awsPromptCacheTtlDescription": "How long Bedrock keeps the cached prompt. 1 hour is only supported by some Claude models (e.g. Sonnet 4.5, Haiku 4.5, Opus 4.5).",
 		"cacheUsageNote": "Note: If you don't see cache usage, try selecting a different model and then selecting your desired model again.",
 		"githubCopilot": {
 			"accountActions": "GitHub Copilot account actions",

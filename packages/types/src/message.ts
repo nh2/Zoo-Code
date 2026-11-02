@@ -363,6 +363,8 @@ export const tokenUsageSchema = z.object({
 	totalTokensOut: z.number(),
 	totalCacheWrites: z.number().optional(),
 	totalCacheReads: z.number().optional(),
+	totalCacheInvalidationCost: z.number().optional(),
+	cacheExpiresAt: z.number().optional(),
 	totalCost: z.number(),
 	contextTokens: z.number(),
 })

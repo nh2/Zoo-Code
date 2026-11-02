@@ -14,6 +14,12 @@ import { NodeHttpHandler } from "@smithy/node-http-handler"
 import OpenAI from "openai"
 import { fromIni } from "@aws-sdk/credential-providers"
 import { Anthropic } from "@anthropic-ai/sdk"
+import {
+	calculateBedrockCacheCost,
+	type BedrockCacheDetail,
+	type BedrockCacheState,
+	type BedrockCacheTtl,
+} from "./bedrock-cache-cost"
 import { HttpProxyAgent } from "http-proxy-agent"
 import { HttpsProxyAgent } from "https-proxy-agent"
 
@@ -304,6 +310,7 @@ export interface StreamEvent {
 			cacheWriteInputTokens?: number
 			cacheReadInputTokenCount?: number
 			cacheWriteInputTokenCount?: number
+			cacheDetails?: BedrockCacheDetail[]
 		}
 		metrics?: {
 			latencyMs: number
@@ -343,6 +350,7 @@ export type UsageType = {
 	cacheWriteInputTokens?: number
 	cacheReadInputTokenCount?: number
 	cacheWriteInputTokenCount?: number
+	cacheDetails?: BedrockCacheDetail[]
 }
 
 /************************************************************************************
@@ -593,6 +601,7 @@ export class AwsBedrockHandler extends BaseProvider implements SingleCompletionH
 			modelConfig.info,
 			conversationId,
 			keepThinking,
+			this.options.awsPromptCacheTtl,
 		)
 
 		let additionalModelRequestFields: BedrockAdditionalModelFields | undefined
@@ -829,6 +838,28 @@ export class AwsBedrockHandler extends BaseProvider implements SingleCompletionH
 					const cacheReadTokens = usage.cacheReadInputTokens || usage.cacheReadInputTokenCount || 0
 					const cacheWriteTokens = usage.cacheWriteInputTokens || usage.cacheWriteInputTokenCount || 0
 
+					// Price cache writes per TTL (1h = 2x, 5m = 1.25x input price) and track
+					// invalidation cost and expiry for this conversation.
+					const cacheCost =
+						cacheReadTokens > 0 || cacheWriteTokens > 0
+							? calculateBedrockCacheCost({
+									modelInfo: this.costModelConfig.info?.inputPrice
+										? this.costModelConfig.info
+										: modelConfig.info,
+									inputTokens: usage.inputTokens || 0,
+									outputTokens: usage.outputTokens || 0,
+									cacheReadTokens,
+									cacheWriteTokens,
+									cacheDetails: usage.cacheDetails,
+									configuredTtl: this.options.awsPromptCacheTtl ?? "5m",
+									previous: this.cacheStates[conversationId],
+									now: Date.now(),
+								})
+							: undefined
+					if (cacheCost?.state) {
+						this.cacheStates[conversationId] = cacheCost.state
+					}
+
 					// Always include all available token information
 					yield {
 						type: "usage",
@@ -836,6 +867,11 @@ export class AwsBedrockHandler extends BaseProvider implements SingleCompletionH
 						outputTokens: usage.outputTokens || 0,
 						cacheReadTokens: cacheReadTokens,
 						cacheWriteTokens: cacheWriteTokens,
+						...(cacheCost && {
+							totalCost: cacheCost.totalCost,
+							cacheInvalidationCost: cacheCost.cacheInvalidationCost,
+							cacheExpiresAt: cacheCost.cacheExpiresAt,
+						}),
 					}
 					continue
 				}
@@ -1216,6 +1252,7 @@ export class AwsBedrockHandler extends BaseProvider implements SingleCompletionH
 		modelInfo?: any,
 		conversationId?: string, // Optional conversation ID to track cache points across messages
 		keepThinking = false,
+		cacheTtl?: BedrockCacheTtl,
 	): { system: SystemContentBlock[]; messages: Message[] } {
 		// First convert messages using shared converter for proper image handling
 		const convertedMessages = sharedConverter(anthropicMessages as Anthropic.Messages.MessageParam[], {
@@ -1253,6 +1290,7 @@ export class AwsBedrockHandler extends BaseProvider implements SingleCompletionH
 			messages: anthropicMessages as Anthropic.Messages.MessageParam[],
 			usePromptCache,
 			previousCachePointPlacements: previousPlacements,
+			cacheTtl,
 		}
 
 		// Get cache point placements
@@ -1270,7 +1308,12 @@ export class AwsBedrockHandler extends BaseProvider implements SingleCompletionH
 			if (placement) {
 				return {
 					...msg,
-					content: [...(msg.content || []), { cachePoint: { type: "default" } } as ContentBlock],
+					content: [
+						...(msg.content || []),
+						{
+							cachePoint: cacheTtl === "1h" ? { type: "default", ttl: "1h" } : { type: "default" },
+						} as unknown as ContentBlock,
+					],
 				}
 			}
 			return msg
@@ -1592,6 +1635,7 @@ export class AwsBedrockHandler extends BaseProvider implements SingleCompletionH
 
 	// Store previous cache point placements for maintaining consistency across consecutive messages
 	private previousCachePointPlacements: { [conversationId: string]: any[] } = {}
+	private cacheStates: { [conversationId: string]: BedrockCacheState } = {}
 
 	private supportsAwsPromptCache(modelConfig: { id: BedrockModelId | string; info: ModelInfo }): boolean | undefined {
 		// Check if the model supports prompt cache

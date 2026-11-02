@@ -285,6 +285,7 @@ export const globalSettingsSchema = z.object({
 	includeTaskHistoryInEnhance: z.boolean().optional(),
 	historyPreviewCollapsed: z.boolean().optional(),
 	reasoningBlockCollapsed: z.boolean().optional(),
+	showCacheCountdown: z.boolean().optional(), // Show the prompt cache expiry countdown in the collapsed task header
 	/**
 	 * Font size (in pixels) for the Zoo Code chat/webview UI.
 	 * When unset (or `null`), the webview inherits VS Code's `--vscode-font-size`.

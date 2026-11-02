@@ -1,4 +1,4 @@
-import { memo, useRef, useState, useMemo } from "react"
+import { memo, useRef, useState, useMemo, useEffect } from "react"
 import { useTranslation } from "react-i18next"
 import {
 	ChevronUp,
@@ -36,6 +36,8 @@ export interface TaskHeaderProps {
 	tokensOut: number
 	cacheWrites?: number
 	cacheReads?: number
+	cacheInvalidationCost?: number
+	cacheExpiresAt?: number
 	totalCost: number
 	aggregatedCost?: number
 	hasSubtasks?: boolean
@@ -47,12 +49,46 @@ export interface TaskHeaderProps {
 	todos?: any[]
 }
 
+const CacheExpiry = ({ expiresAt, compact }: { expiresAt: number; compact?: boolean }) => {
+	const { t } = useTranslation()
+	const [now, setNow] = useState(() => Date.now())
+
+	useEffect(() => {
+		const id = setInterval(() => setNow(Date.now()), 1000)
+		return () => clearInterval(id)
+	}, [])
+
+	const remaining = Math.max(0, expiresAt - now)
+	const minutes = Math.floor(remaining / 60_000)
+	const seconds = Math.floor((remaining % 60_000) / 1000)
+	const time = `${minutes}:${seconds.toString().padStart(2, "0")}`
+
+	if (compact) {
+		return (
+			<StandardTooltip content={t("chat:task.cache")}>
+				<span className="inline-flex items-center gap-1">
+					<HardDriveDownload className="size-3" />
+					{remaining === 0 ? t("chat:task.cacheExpired") : time}
+				</span>
+			</StandardTooltip>
+		)
+	}
+
+	return (
+		<span className="text-vscode-descriptionForeground">
+			{remaining === 0 ? t("chat:task.cacheExpired") : t("chat:task.cacheExpiresIn", { time })}
+		</span>
+	)
+}
+
 const TaskHeader = ({
 	task,
 	tokensIn,
 	tokensOut,
 	cacheWrites,
 	cacheReads,
+	cacheInvalidationCost,
+	cacheExpiresAt,
 	totalCost,
 	aggregatedCost,
 	hasSubtasks,
@@ -64,7 +100,7 @@ const TaskHeader = ({
 	todos,
 }: TaskHeaderProps) => {
 	const { t } = useTranslation()
-	const { apiConfiguration, currentTaskItem } = useExtensionState()
+	const { apiConfiguration, currentTaskItem, showCacheCountdown } = useExtensionState()
 	const { id: modelId, info: model } = useSelectedModel(apiConfiguration)
 	const [isTaskExpanded, setIsTaskExpanded] = useState(false)
 	const [isRenaming, setIsRenaming] = useState(false)
@@ -317,6 +353,12 @@ const TaskHeader = ({
 											</span>
 										</>
 									</StandardTooltip>
+									{typeof cacheExpiresAt === "number" && showCacheCountdown && (
+										<>
+											<span>·</span>
+											<CacheExpiry expiresAt={cacheExpiresAt} compact />
+										</>
+									)}
 								</>
 							)}
 						</div>
@@ -417,6 +459,16 @@ const TaskHeader = ({
 															<HardDriveUpload className="size-2.5" />
 															<span>{formatLargeNumber(cacheReads)}</span>
 														</>
+													)}
+													{!!cacheInvalidationCost && (
+														<span className="text-vscode-descriptionForeground">
+															{t("chat:task.cacheRewriteCost", {
+																cost: cacheInvalidationCost.toFixed(4),
+															})}
+														</span>
+													)}
+													{typeof cacheExpiresAt === "number" && (
+														<CacheExpiry expiresAt={cacheExpiresAt} />
 													)}
 												</div>
 											</td>

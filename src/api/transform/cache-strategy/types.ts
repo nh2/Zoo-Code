@@ -57,4 +57,6 @@ export interface CacheStrategyConfig {
 	usePromptCache: boolean
 	/** Previous cache point placements (for maintaining consistency across consecutive messages) */
 	previousCachePointPlacements?: CachePointPlacement[]
+	/** Cache lifetime requested for cache points; omitted means the 5 minute default */
+	cacheTtl?: "5m" | "1h"
 }

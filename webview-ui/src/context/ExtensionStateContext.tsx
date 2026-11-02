@@ -283,6 +283,7 @@ export const createInitialExtensionState = (): ExtensionState => ({
 	terminalProfile: undefined, // Default VS Code terminal profile (use VS Code default)
 	historyPreviewCollapsed: false, // Initialize the new state (default to expanded)
 	reasoningBlockCollapsed: true, // Default to collapsed
+	showCacheCountdown: true, // Default to showing the cache countdown
 	enterBehavior: "send", // Default: Enter sends, Shift+Enter creates newline
 	cloudUserInfo: null,
 	cloudIsAuthenticated: false,
@@ -625,6 +626,7 @@ export const ExtensionStateContextProvider: React.FC<{
 		// undefined so it matches the context type and means "use VS Code default".
 		chatFontSize: state.chatFontSize ?? undefined,
 		reasoningBlockCollapsed: state.reasoningBlockCollapsed ?? true,
+		showCacheCountdown: state.showCacheCountdown ?? true,
 		didHydrateState,
 		showWelcome,
 		theme,
