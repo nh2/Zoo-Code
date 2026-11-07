@@ -1,3 +1,5 @@
+import type { ClineMessage } from "@roo-code/types"
+
 import { Task } from "../Task"
 
 type QueueTaskTestAccess = {
@@ -120,6 +122,22 @@ describe("Task.ask queued message drain", () => {
 
 		expect(result).toMatchObject({ response: "yesButtonClicked", text: "Approval context" })
 		expect(task.messageQueueService.isEmpty()).toBe(true)
+	})
+
+	it.each([
+		["use_mcp_server", "{}", true],
+		["tool", JSON.stringify({ tool: "readFile" }), true],
+		["command", "npm test", undefined],
+	] as const)("stamps isAnswered on insertion of a queue-approved %s ask", async (type, text, expected) => {
+		const task = await createTask()
+		const addToClineMessages = vi.fn<(message: ClineMessage) => Promise<void>>(async () => {})
+		Object.assign(task, { addToClineMessages })
+		task.messageQueueService.addMessage("Approval context")
+
+		await task.ask(type, text, false)
+
+		expect(addToClineMessages).toHaveBeenCalledWith(expect.objectContaining({ type: "ask", ask: type }))
+		expect(addToClineMessages.mock.calls[0]?.[0].isAnswered).toBe(expected)
 	})
 
 	it("does not auto-approve a protected command ask from a queued message", async () => {

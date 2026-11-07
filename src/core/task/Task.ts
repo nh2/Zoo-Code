@@ -2007,6 +2007,9 @@ export class Task extends EventEmitter<TaskEvents> implements TaskLike {
 				})
 		const isAutoAnswered = approval.decision === "approve" || approval.decision === "deny"
 		const autoApprovalDecision = isAutoAnswered ? approval.decision : undefined
+		// Command asks are excluded: their queued approval still awaits a policy re-check that may release or deny it.
+		const isQueueApproved = queuedAskResolution?.response === "yesButtonClicked" && type !== "command"
+		const isAnsweredOnInsert = isAutoAnswered || isQueueApproved
 
 		// Re-check: an abort during the getState/checkAutoApproval awaits must not post an ask row.
 		if (this.abort) {
@@ -2076,7 +2079,7 @@ export class Task extends EventEmitter<TaskEvents> implements TaskLike {
 					lastMessage.partial = false
 					lastMessage.progressStatus = progressStatus
 					lastMessage.isProtected = isProtected
-					if (isAutoAnswered) {
+					if (isAnsweredOnInsert) {
 						lastMessage.isAnswered = true
 						lastMessage.autoApprovalDecision = autoApprovalDecision
 					}
@@ -2099,7 +2102,7 @@ export class Task extends EventEmitter<TaskEvents> implements TaskLike {
 						ask: type,
 						text,
 						isProtected,
-						isAnswered: isAutoAnswered || undefined,
+						isAnswered: isAnsweredOnInsert || undefined,
 						autoApprovalDecision,
 					})
 				}
@@ -2117,7 +2120,7 @@ export class Task extends EventEmitter<TaskEvents> implements TaskLike {
 				ask: type,
 				text,
 				isProtected,
-				isAnswered: isAutoAnswered || undefined,
+				isAnswered: isAnsweredOnInsert || undefined,
 				autoApprovalDecision,
 			})
 		}
