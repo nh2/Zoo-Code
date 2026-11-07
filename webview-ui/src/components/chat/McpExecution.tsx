@@ -20,6 +20,40 @@ import McpToolRow from "../mcp/McpToolRow"
 
 import { Markdown } from "./Markdown"
 
+type CachedMcpExecution = { status: McpExecutionStatus; response: string }
+
+// Survives row remounts (virtualized scrolling, view switches) that would otherwise drop the running status and Abort.
+const executionCache = new Map<string, CachedMcpExecution>()
+
+const parseMcpExecutionStatus = (event: MessageEvent): McpExecutionStatus | undefined => {
+	const message: ExtensionMessage = event.data
+	if (message?.type !== "mcpExecutionStatus") {
+		return undefined
+	}
+	const result = mcpExecutionStatusSchema.safeParse(safeJsonParse(message.text || "{}", {}))
+	return result.success ? result.data : undefined
+}
+
+const recordMcpExecutionStatus = (event: MessageEvent) => {
+	const data = parseMcpExecutionStatus(event)
+	if (!data) {
+		return
+	}
+	if (data.status === "completed" || data.status === "error") {
+		executionCache.delete(data.executionId)
+		return
+	}
+	const response = executionCache.get(data.executionId)?.response ?? ""
+	executionCache.set(data.executionId, {
+		status: data,
+		response: data.status === "output" && data.response ? response + data.response : response,
+	})
+}
+
+if (typeof window !== "undefined") {
+	window.addEventListener("message", recordMcpExecutionStatus)
+}
+
 interface McpExecutionProps {
 	executionId: string
 	text?: string
@@ -50,9 +84,10 @@ export const McpExecution = ({
 }: McpExecutionProps) => {
 	const { t } = useTranslation("mcp")
 
-	// State for tracking MCP response status
-	const [status, setStatus] = useState<McpExecutionStatus | null>(null)
-	const [responseText, setResponseText] = useState(text || "")
+	const [status, setStatus] = useState<McpExecutionStatus | null>(
+		() => executionCache.get(executionId)?.status ?? null,
+	)
+	const [responseText, setResponseText] = useState(() => executionCache.get(executionId)?.response || text || "")
 	const [argumentsText, setArgumentsText] = useState(text || "")
 	const [serverName, setServerName] = useState(initialServerName)
 	const [toolName, setToolName] = useState(initialToolName)
@@ -133,29 +168,15 @@ export const McpExecution = ({
 	// Listen for MCP execution status messages
 	const onMessage = useCallback(
 		(event: MessageEvent) => {
-			const message: ExtensionMessage = event.data
-
-			if (message.type === "mcpExecutionStatus") {
-				try {
-					const result = mcpExecutionStatusSchema.safeParse(safeJsonParse(message.text || "{}", {}))
-
-					if (result.success) {
-						const data = result.data
-
-						// Only update if this message is for our response
-						if (data.executionId === executionId) {
-							setStatus(data)
-
-							if (data.status === "output" && data.response) {
-								setResponseText((prev) => prev + data.response)
-							} else if (data.status === "completed" && data.response) {
-								setResponseText(data.response)
-							}
-						}
-					}
-				} catch (e) {
-					console.error("Failed to parse MCP execution status", e)
-				}
+			const data = parseMcpExecutionStatus(event)
+			if (data?.executionId !== executionId) {
+				return
+			}
+			setStatus(data)
+			if (data.status === "output" && data.response) {
+				setResponseText((prev) => prev + data.response)
+			} else if (data.status === "completed" && data.response) {
+				setResponseText(data.response)
 			}
 		},
 		[executionId],
