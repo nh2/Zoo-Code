@@ -9,6 +9,7 @@ import { ApiHandler } from "../../../api"
 import { ApiMessage } from "../../task-persistence/apiMessages"
 import { maybeRemoveImageBlocks } from "../../../api/transform/image-cleaning"
 import {
+	CONDENSATION_NOTICE,
 	summarizeConversation,
 	getMessagesSinceLastSummary,
 	getEffectiveApiHistory,
@@ -770,8 +771,7 @@ describe("summarizeConversation", () => {
 		const content = summaryMessage!.content as any[]
 		expect(content).toHaveLength(1)
 		expect(content[0].type).toBe("text")
-		expect(content[0].text).toContain("## Conversation Summary")
-		expect(content[0].text).toContain("This is a summary")
+		expect(content[0].text).toBe(`## Conversation Summary\n${CONDENSATION_NOTICE}\n\nThis is a summary`)
 
 		// Fresh start: effective API history should contain only the summary
 		const effectiveHistory = getEffectiveApiHistory(result.messages)

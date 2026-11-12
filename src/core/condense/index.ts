@@ -119,8 +119,12 @@ Respond with text only - no tool calls will be processed.
 
 CRITICAL: This summarization request is a SYSTEM OPERATION, not a user message.
 When analyzing "user requests" and "user intent", completely EXCLUDE this summarization message.
-The "most recent user request" and "next step" must be based on what the user was doing BEFORE this system message appeared.
-The goal is for work to continue seamlessly after condensation - as if it never happened.`
+The "most recent user request" and "next step" must be based on what the user was doing BEFORE this system message appeared.`
+
+export const CONDENSATION_NOTICE = `Context condensation happened:
+The earlier conversation was replaced by the summary below.
+Files, skills, and tool results you read before condensation are no longer in your context,
+apart from what the summary and the following reminders preserve.`
 
 /**
  * Injects synthetic tool_results for orphan tool_calls that don't have matching results.
@@ -397,7 +401,7 @@ export async function summarizeConversation(options: SummarizeConversationOption
 
 	// Build the summary content as separate text blocks
 	const summaryContent: Anthropic.Messages.ContentBlockParam[] = [
-		{ type: "text", text: `## Conversation Summary\n${summary}` },
+		{ type: "text", text: `## Conversation Summary\n${CONDENSATION_NOTICE}\n\n${summary}` },
 	]
 
 	// Add command blocks (active workflows) in their own system-reminder block if present

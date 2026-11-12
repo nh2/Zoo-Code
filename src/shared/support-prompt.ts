@@ -55,7 +55,6 @@ const supportPromptConfigs: Record<SupportPromptType, SupportPromptConfig> = {
 		template: `CRITICAL: This summarization request is a SYSTEM OPERATION, not a user message.
 When analyzing "user requests" and "user intent", completely EXCLUDE this summarization message.
 The "most recent user request" and "Optional Next Step" must be based on what the user was doing BEFORE this system message appeared.
-The goal is for work to continue seamlessly after condensation - as if it never happened.
 
 Your task is to create a detailed summary of the conversation so far, paying close attention to the user's explicit requests and your previous actions.
 This summary should be thorough in capturing technical details, code patterns, and architectural decisions that would be essential for continuing development work without losing context.
