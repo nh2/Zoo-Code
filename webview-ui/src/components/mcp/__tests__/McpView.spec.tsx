@@ -1,15 +1,24 @@
+import type { McpServer } from "@roo-code/types"
+
 import { fireEvent, render, screen } from "@/utils/test-utils"
+import { vscode } from "@src/utils/vscode"
 
 import McpView from "../McpView"
 
 const setMcpEnabled = vi.fn()
 
+const extensionState = vi.hoisted(() => ({
+	mcpServers: [] as McpServer[],
+	alwaysAllowMcp: false,
+	mcpEnabled: false,
+}))
+
 vi.mock("@src/context/ExtensionStateContext", () => ({
-	useExtensionState: () => ({
-		mcpServers: [],
-		alwaysAllowMcp: false,
-		mcpEnabled: false,
-	}),
+	useExtensionState: () => extensionState,
+}))
+
+vi.mock("@src/utils/vscode", () => ({
+	vscode: { postMessage: vi.fn() },
 }))
 
 vi.mock("@src/i18n/TranslationContext", () => ({
@@ -59,6 +68,8 @@ vi.mock("../McpEnabledToggle", () => ({
 describe("McpView", () => {
 	beforeEach(() => {
 		vi.clearAllMocks()
+		extensionState.mcpServers = []
+		extensionState.mcpEnabled = false
 	})
 
 	it("uses extension state when no buffered value is provided", () => {
@@ -73,5 +84,54 @@ describe("McpView", () => {
 		fireEvent.click(screen.getByTestId("mcp-enabled-toggle"))
 
 		expect(setMcpEnabled).toHaveBeenCalledWith(false)
+	})
+
+	describe("disconnected server", () => {
+		const crashedServer: McpServer = {
+			name: "crashy-server",
+			config: "{}",
+			status: "disconnected",
+			source: "global",
+			error: "MCP error -32000: Connection closed",
+			stderrTail: "Traceback (most recent call last):\nOSError: [Errno 5] Input/output error: '/x'",
+			errorHistory: [{ message: "OSError: [Errno 5] Input/output error: '/x'", timestamp: 1, level: "error" }],
+		}
+
+		const renderWithServer = (server: McpServer) => {
+			extensionState.mcpEnabled = true
+			extensionState.mcpServers = [server]
+			render(<McpView />)
+		}
+
+		it("shows the error, the stderr tail and a Show Logs button that opens the Output channel", () => {
+			renderWithServer(crashedServer)
+
+			expect(screen.getByText("MCP error -32000: Connection closed")).toBeInTheDocument()
+			expect(screen.getByTestId("mcp-stderr-tail")).toHaveTextContent("OSError: [Errno 5] Input/output error")
+
+			fireEvent.click(screen.getByText("mcp:serverStatus.showLogs"))
+
+			expect(vscode.postMessage).toHaveBeenCalledWith({ type: "showMcpOutputChannel" })
+		})
+
+		it("can be expanded to a Logs tab with the error history", () => {
+			renderWithServer(crashedServer)
+
+			expect(screen.queryByText(/mcp:tabs\.logs/)).not.toBeInTheDocument()
+
+			fireEvent.click(screen.getByText("crashy-server"))
+
+			expect(screen.getByText(/mcp:tabs\.logs/)).toHaveTextContent("(1)")
+			expect(screen.queryByText(/mcp:tabs\.tools/)).not.toBeInTheDocument()
+		})
+
+		it("is not expandable while disabled", () => {
+			renderWithServer({ ...crashedServer, disabled: true })
+
+			fireEvent.click(screen.getByText("crashy-server"))
+
+			expect(screen.queryByText(/mcp:tabs\.logs/)).not.toBeInTheDocument()
+			expect(screen.queryByText("mcp:serverStatus.showLogs")).not.toBeInTheDocument()
+		})
 	})
 })

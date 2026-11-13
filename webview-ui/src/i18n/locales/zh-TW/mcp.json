@@ -50,7 +50,9 @@
 	},
 	"serverStatus": {
 		"retrying": "重試中...",
-		"retryConnection": "重試連線"
+		"retryConnection": "重試連線",
+		"showLogs": "顯示記錄",
+		"lastStderr": "最近的 stderr 輸出："
 	},
 	"execution": {
 		"running": "執行中",

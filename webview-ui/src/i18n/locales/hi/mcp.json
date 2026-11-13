@@ -49,7 +49,9 @@
 	},
 	"serverStatus": {
 		"retrying": "फिर से कोशिश कर रहा है...",
-		"retryConnection": "कनेक्शन फिर से आज़माएँ"
+		"retryConnection": "कनेक्शन फिर से आज़माएँ",
+		"showLogs": "लॉग दिखाएँ",
+		"lastStderr": "आखिरी stderr आउटपुट:"
 	},
 	"refreshMCP": "एमसीपी सर्वर रीफ्रेश करें",
 	"execution": {

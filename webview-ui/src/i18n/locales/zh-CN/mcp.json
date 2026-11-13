@@ -49,7 +49,9 @@
 	},
 	"serverStatus": {
 		"retrying": "重试中...",
-		"retryConnection": "重试连接"
+		"retryConnection": "重试连接",
+		"showLogs": "显示日志",
+		"lastStderr": "最近的 stderr 输出："
 	},
 	"refreshMCP": "刷新 MCP 服务器",
 	"execution": {

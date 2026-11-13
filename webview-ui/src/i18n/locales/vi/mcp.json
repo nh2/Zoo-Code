@@ -49,7 +49,9 @@
 	},
 	"serverStatus": {
 		"retrying": "Đang thử lại...",
-		"retryConnection": "Thử kết nối lại"
+		"retryConnection": "Thử kết nối lại",
+		"showLogs": "Xem nhật ký",
+		"lastStderr": "Đầu ra stderr gần nhất:"
 	},
 	"refreshMCP": "Làm mới Máy chủ MCP",
 	"execution": {

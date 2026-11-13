@@ -56,6 +56,8 @@ export type McpServer = {
 	config: string
 	status: "connected" | "connecting" | "disconnected"
 	error?: string
+	/** Last lines a stdio server wrote to stderr, newline-joined. */
+	stderrTail?: string
 	errorHistory?: McpErrorEntry[]
 	tools?: McpTool[]
 	resources?: McpResource[]

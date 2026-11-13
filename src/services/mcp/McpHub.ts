@@ -43,6 +43,14 @@ import { arePathsEqual, getWorkspacePath } from "../../utils/path"
 import { injectVariables } from "../../utils/config"
 import { safeWriteJson } from "../../utils/safeWriteJson"
 import { sanitizeMcpName, toolNamesMatch } from "../../utils/mcp-name"
+import {
+	MAX_STDERR_ENTRY_LENGTH,
+	STDERR_TAIL_LINES,
+	StderrLineSplitter,
+	groupStderrLines,
+	logMcpServerEvent,
+	truncateKeepingTail,
+} from "./stderrLog"
 
 // Discriminated union for connection states
 export type ConnectedMcpConnection = {
@@ -790,7 +798,7 @@ export class McpHub {
 						? ["/c", configInjected.command, ...(configInjected.args || [])]
 						: configInjected.args
 
-				transport = new StdioClientTransport({
+				const stdioTransport = new StdioClientTransport({
 					command,
 					args,
 					cwd: configInjected.cwd,
@@ -800,19 +808,32 @@ export class McpHub {
 					},
 					stderr: "pipe",
 				})
+				transport = stdioTransport
+
+				logMcpServerEvent(
+					name,
+					`Starting: ${JSON.stringify([command, ...(args ?? [])])} (cwd: ${configInjected.cwd})`,
+				)
+
+				const stderrSplitter = new StderrLineSplitter()
+				const flushStderr = () => this.recordStderr(name, source, stdioTransport, stderrSplitter.flush())
 
 				// Set up stdio specific error handling
 				transport.onerror = async (error) => {
 					console.error(`Transport error for "${name}":`, error)
+					const message = error instanceof Error ? error.message : `${error}`
+					logMcpServerEvent(name, `Transport error: ${message}`)
 					const connection = this.findConnection(name, source)
 					if (connection) {
 						connection.server.status = "disconnected"
-						this.appendErrorMessage(connection, error instanceof Error ? error.message : `${error}`)
+						this.appendErrorMessage(connection, message)
 					}
 					await this.notifyWebviewOfServerChanges()
 				}
 
 				transport.onclose = async () => {
+					await flushStderr()
+					logMcpServerEvent(name, "Connection closed")
 					const connection = this.findConnection(name, source)
 					if (connection) {
 						connection.server.status = "disconnected"
@@ -823,27 +844,14 @@ export class McpHub {
 				// transport.stderr is only available after the process has been started. However we can't start it separately from the .connect() call because it also starts the transport. And we can't place this after the connect call since we need to capture the stderr stream before the connection is established, in order to capture errors during the connection process.
 				// As a workaround, we start the transport ourselves, and then monkey-patch the start method to no-op so that .connect() doesn't try to start it again.
 				await transport.start()
-				const stderrStream = transport.stderr
+				logMcpServerEvent(name, `Process started (pid: ${stdioTransport.pid ?? "unknown"})`)
+				const stderrStream = stdioTransport.stderr
 				if (stderrStream) {
-					stderrStream.on("data", async (data: Buffer) => {
-						const output = data.toString()
-						// Check if output contains INFO level log
-						const isInfoLog = /INFO/i.test(output)
-
-						if (isInfoLog) {
-							// Log normal informational messages
-							console.log(`Server "${name}" info:`, output)
-						} else {
-							// Treat as error log
-							console.error(`Server "${name}" stderr:`, output)
-							const connection = this.findConnection(name, source)
-							if (connection) {
-								this.appendErrorMessage(connection, output)
-								if (connection.server.status === "disconnected") {
-									await this.notifyWebviewOfServerChanges()
-								}
-							}
-						}
+					stderrStream.on("data", (data: Buffer) => {
+						void this.recordStderr(name, source, stdioTransport, stderrSplitter.push(data.toString()))
+					})
+					stderrStream.on("end", () => {
+						void flushStderr()
 					})
 				} else {
 					console.error(`No stderr stream for ${name}`)
@@ -1075,6 +1083,7 @@ export class McpHub {
 
 			connection.server.status = "connected"
 			connection.server.error = ""
+			logMcpServerEvent(name, "Connected")
 			connection.server.instructions = client.getInstructions()
 
 			// Initial fetch of tools and resources
@@ -1083,13 +1092,53 @@ export class McpHub {
 			connection.server.resourceTemplates = await this.fetchResourceTemplatesList(name, source)
 		} catch (error) {
 			await pendingAuthProvider?.close()
+			const message = error instanceof Error ? error.message : `${error}`
+			logMcpServerEvent(name, `Connection failed: ${message}`)
 			// Update status with error
 			const connection = this.findConnection(name, source)
 			if (connection) {
 				connection.server.status = "disconnected"
-				this.appendErrorMessage(connection, error instanceof Error ? error.message : `${error}`)
+				this.appendErrorMessage(connection, message)
 			}
 			throw error
+		}
+	}
+
+	/**
+	 * Records whole stderr lines in the Output channel, `errorHistory` and `stderrTail`.
+	 * Does not touch `server.error`, so the connect error is not replaced by later output.
+	 */
+	private async recordStderr(
+		name: string,
+		source: "global" | "project",
+		transport: StdioClientTransport,
+		lines: string[],
+	): Promise<void> {
+		if (lines.length === 0) {
+			return
+		}
+		logMcpServerEvent(name, `stderr: ${lines.join("\n")}`)
+
+		const connection = this.findConnection(name, source)
+		// A restarted server gets a new connection; ignore output from the old process.
+		if (!connection || connection.transport !== transport) {
+			return
+		}
+
+		for (const { level, text } of groupStderrLines(lines)) {
+			this.appendErrorMessage(connection, text, level, { keepTail: true, setCurrentError: false })
+		}
+
+		const nonEmptyLines = lines.filter((line) => line.trim() !== "")
+		if (nonEmptyLines.length === 0) {
+			return
+		}
+		const previous = connection.server.stderrTail ? connection.server.stderrTail.split("\n") : []
+		const tail = [...previous, ...nonEmptyLines].slice(-STDERR_TAIL_LINES).join("\n")
+		connection.server.stderrTail = truncateKeepingTail(tail, MAX_STDERR_ENTRY_LENGTH)
+
+		if (connection.server.status === "disconnected") {
+			await this.notifyWebviewOfServerChanges()
 		}
 	}
 
@@ -1425,10 +1474,16 @@ export class McpHub {
 		}
 	}
 
-	private appendErrorMessage(connection: McpConnection, error: string, level: "error" | "warn" | "info" = "error") {
+	private appendErrorMessage(
+		connection: McpConnection,
+		error: string,
+		level: "error" | "warn" | "info" = "error",
+		{ keepTail = false, setCurrentError = true }: { keepTail?: boolean; setCurrentError?: boolean } = {},
+	) {
 		const MAX_ERROR_LENGTH = 1000
-		const truncatedError =
-			error.length > MAX_ERROR_LENGTH
+		const truncatedError = keepTail
+			? truncateKeepingTail(error, MAX_STDERR_ENTRY_LENGTH)
+			: error.length > MAX_ERROR_LENGTH
 				? `${error.substring(0, MAX_ERROR_LENGTH)}...(error message truncated)`
 				: error
 
@@ -1448,8 +1503,9 @@ export class McpHub {
 			connection.server.errorHistory = connection.server.errorHistory.slice(-100)
 		}
 
-		// Update current error display
-		connection.server.error = truncatedError
+		if (setCurrentError) {
+			connection.server.error = truncatedError
+		}
 	}
 
 	/**
@@ -1805,6 +1861,7 @@ export class McpHub {
 		const connection = this.findConnection(serverName, source)
 		const config = connection?.server.config
 		if (config) {
+			logMcpServerEvent(serverName, "Restarting")
 			vscode.window.showInformationMessage(t("mcp:info.server_restarting", { serverName }))
 			connection.server.status = "connecting"
 			connection.server.error = ""

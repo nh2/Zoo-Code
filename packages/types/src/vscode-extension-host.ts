@@ -547,6 +547,7 @@ export interface WebviewMessage {
 		| "openMcpSettings"
 		| "openProjectMcpSettings"
 		| "restartMcpServer"
+		| "showMcpOutputChannel"
 		| "refreshAllMcpServers"
 		| "toggleToolAlwaysAllow"
 		| "toggleToolEnabledForPrompt"

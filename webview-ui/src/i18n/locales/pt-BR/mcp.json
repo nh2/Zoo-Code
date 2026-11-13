@@ -49,7 +49,9 @@
 	},
 	"serverStatus": {
 		"retrying": "Tentando novamente...",
-		"retryConnection": "Tentar reconectar"
+		"retryConnection": "Tentar reconectar",
+		"showLogs": "Mostrar logs",
+		"lastStderr": "Última saída do stderr:"
 	},
 	"refreshMCP": "Atualizar Servidores MCP",
 	"execution": {

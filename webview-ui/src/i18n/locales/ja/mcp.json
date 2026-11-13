@@ -49,7 +49,9 @@
 	},
 	"serverStatus": {
 		"retrying": "再試行中...",
-		"retryConnection": "再接続"
+		"retryConnection": "再接続",
+		"showLogs": "ログを表示",
+		"lastStderr": "直近の stderr 出力:"
 	},
 	"refreshMCP": "MCPサーバーを更新",
 	"execution": {

@@ -50,7 +50,9 @@
 	},
 	"serverStatus": {
 		"retrying": "Retrying...",
-		"retryConnection": "Retry Connection"
+		"retryConnection": "Retry Connection",
+		"showLogs": "Show Logs",
+		"lastStderr": "Last stderr output:"
 	},
 	"execution": {
 		"running": "Running",

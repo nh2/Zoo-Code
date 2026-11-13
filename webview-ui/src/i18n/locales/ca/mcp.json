@@ -49,7 +49,9 @@
 	},
 	"serverStatus": {
 		"retrying": "Tornant a intentar...",
-		"retryConnection": "Torna a intentar la connexió"
+		"retryConnection": "Torna a intentar la connexió",
+		"showLogs": "Mostra els registres",
+		"lastStderr": "Última sortida de stderr:"
 	},
 	"refreshMCP": "Actualitza els servidors MCP",
 	"execution": {

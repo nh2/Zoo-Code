@@ -50,7 +50,9 @@
 	},
 	"serverStatus": {
 		"retrying": "Mencoba lagi...",
-		"retryConnection": "Coba Koneksi Lagi"
+		"retryConnection": "Coba Koneksi Lagi",
+		"showLogs": "Tampilkan Log",
+		"lastStderr": "Output stderr terakhir:"
 	},
 	"execution": {
 		"running": "Berjalan",

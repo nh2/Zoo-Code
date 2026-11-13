@@ -80,6 +80,11 @@ vi.mock("../../../utils/safeWriteJson", () => ({
 
 vi.mock("delay", () => ({ default: vi.fn().mockResolvedValue(undefined) }))
 
+const mockOutputChannel = vi.hoisted(() => ({
+	appendLine: vi.fn(),
+	show: vi.fn(),
+}))
+
 vi.mock("vscode", () => ({
 	workspace: {
 		createFileSystemWatcher: vi.fn().mockReturnValue({
@@ -96,6 +101,7 @@ vi.mock("vscode", () => ({
 		showErrorMessage: vi.fn(),
 		showInformationMessage: vi.fn(),
 		showWarningMessage: vi.fn(),
+		createOutputChannel: vi.fn(() => mockOutputChannel),
 		createTextEditorDecorationType: vi.fn().mockReturnValue({
 			dispose: vi.fn(),
 		}),
@@ -601,6 +607,139 @@ describe("McpHub", () => {
 
 			expect(mockAuthProvider.close).toHaveBeenCalledTimes(1)
 			expect(StreamableHTTPClientTransport).not.toHaveBeenCalled()
+		})
+	})
+
+	describe("stdio stderr handling", () => {
+		type StderrHandler = (data: Buffer) => void
+
+		/**
+		 * Starts a hub whose stdio server writes `chunks` to stderr during `connect()`,
+		 * then fails the connect the way the SDK does when the process exits.
+		 */
+		const startFailingServer = async (chunks: string[], { lateChunks = [] as string[] } = {}) => {
+			const stdioModule = await import("@modelcontextprotocol/sdk/client/stdio.js")
+			const clientModule = await import("@modelcontextprotocol/sdk/client/index.js")
+
+			const createMockTransport = () => {
+				let onData: StderrHandler = () => {}
+				return {
+					start: vi.fn().mockResolvedValue(undefined),
+					close: vi.fn().mockResolvedValue(undefined),
+					pid: 4242,
+					stderr: {
+						on: vi.fn((event: string, handler: StderrHandler) => {
+							if (event === "data") {
+								onData = handler
+							}
+						}),
+					},
+					emit: (chunk: string) => onData(Buffer.from(chunk)),
+					onerror: null,
+					onclose: null as null | (() => Promise<void>),
+				}
+			}
+			type MockTransport = ReturnType<typeof createMockTransport>
+
+			vi.mocked(stdioModule.StdioClientTransport).mockImplementation(function () {
+				// Partial double: provides start/close/pid/stderr/onerror/onclose, the members McpHub uses.
+				return createMockTransport() as unknown as InstanceType<typeof stdioModule.StdioClientTransport>
+			})
+
+			vi.mocked(clientModule.Client).mockImplementation(function () {
+				return {
+					connect: vi.fn(async (transport: MockTransport) => {
+						chunks.forEach(transport.emit)
+						throw new Error("MCP error -32000: Connection closed")
+					}),
+					close: vi.fn().mockResolvedValue(undefined),
+					// Partial double: provides connect/close, the only members used on a failed connect.
+				} as unknown as Client
+			})
+
+			vi.mocked(fs.readFile).mockResolvedValue(
+				JSON.stringify({ mcpServers: { "crashy-server": { command: "python3", args: ["server.py"] } } }),
+			)
+
+			const hub = new McpHub(mockProvider as ClineProvider)
+			await hub.waitUntilReady()
+
+			const connection = hub.connections.find((conn) => conn.server.name === "crashy-server")
+			if (connection?.type !== "connected") {
+				throw new Error("crashy-server connection missing")
+			}
+			// The double was created by the StdioClientTransport mock above.
+			const transport = connection.transport as unknown as MockTransport
+			lateChunks.forEach(transport.emit)
+			await transport.onclose?.()
+
+			return { hub, server: connection.server }
+		}
+
+		const outputChannelText = () => mockOutputChannel.appendLine.mock.calls.map(([line]) => line).join("\n")
+
+		it("joins lines split across chunk boundaries and groups lines that arrive together", async () => {
+			const { server } = await startFailingServer([
+				'Traceback (most recent call last):\n  File "server.py", line 3, in <mod',
+				"ule>\nOSError: [Errno 5] Input/output error: '/x'\n",
+			])
+
+			const stderrEntries = server.errorHistory?.filter((entry) => !entry.message.startsWith("MCP error"))
+			expect(stderrEntries).toHaveLength(2)
+			expect(stderrEntries?.[0]).toMatchObject({
+				level: "error",
+				message: "Traceback (most recent call last):",
+			})
+			expect(stderrEntries?.[1].message).toBe(
+				"  File \"server.py\", line 3, in <module>\nOSError: [Errno 5] Input/output error: '/x'",
+			)
+		})
+
+		it("classifies INFO per line and keeps the error line from the same chunk", async () => {
+			const { server } = await startFailingServer(["INFO starting up\nOSError: boom\n"])
+
+			const stderrEntries = server.errorHistory?.filter((entry) => !entry.message.startsWith("MCP error"))
+			expect(stderrEntries).toEqual([
+				expect.objectContaining({ level: "info", message: "INFO starting up" }),
+				expect.objectContaining({ level: "error", message: "OSError: boom" }),
+			])
+			expect(server.stderrTail).toBe("INFO starting up\nOSError: boom")
+		})
+
+		it("keeps the connect error and exposes the stderr tail, including output that arrives late", async () => {
+			const { server } = await startFailingServer(["first line\n"], { lateChunks: ["OSError: late"] })
+
+			expect(server.status).toBe("disconnected")
+			expect(server.error).toBe("MCP error -32000: Connection closed")
+			// The partial "OSError: late" line is flushed when the transport closes.
+			expect(server.stderrTail).toBe("first line\nOSError: late")
+		})
+
+		it("keeps only the last stderr lines in the tail", async () => {
+			const lines = Array.from({ length: 60 }, (_, index) => `line ${index}`)
+			const { server } = await startFailingServer([lines.join("\n") + "\n"])
+
+			expect(server.stderrTail?.split("\n")).toEqual(lines.slice(-50))
+		})
+
+		it("truncates long stderr entries from the start so the exception line survives", async () => {
+			const longFrame = "x".repeat(5000)
+			const { server } = await startFailingServer([`${longFrame}\nOSError: the real cause\n`])
+
+			const entry = server.errorHistory?.find((e) => e.message.includes("OSError"))
+			expect(entry?.message.startsWith("...(truncated)\n")).toBe(true)
+			expect(entry?.message.endsWith("OSError: the real cause")).toBe(true)
+		})
+
+		it("writes the spawn command, stderr and lifecycle events to the Output channel", async () => {
+			await startFailingServer(["OSError: boom\n"])
+
+			const text = outputChannelText()
+			expect(text).toContain('[crashy-server] Starting: ["python3","server.py"]')
+			expect(text).toContain("[crashy-server] Process started (pid: 4242)")
+			expect(text).toContain("[crashy-server] stderr: OSError: boom")
+			expect(text).toContain("[crashy-server] Connection failed: MCP error -32000: Connection closed")
+			expect(text).toContain("[crashy-server] Connection closed")
 		})
 	})
 
