@@ -2470,31 +2470,35 @@ export class McpHub {
 
 		const targetList = config.mcpServers[serverName][listName]
 		const toolIndex = targetList.indexOf(toolName)
+		const listChanged = addTool ? toolIndex === -1 : toolIndex !== -1
 
-		if (addTool && toolIndex === -1) {
-			targetList.push(toolName)
-		} else if (!addTool && toolIndex !== -1) {
-			targetList.splice(toolIndex, 1)
-		}
+		// Rewriting an unchanged file would still reformat it and race with external edits (e.g. git stash).
+		if (listChanged) {
+			if (addTool) {
+				targetList.push(toolName)
+			} else {
+				targetList.splice(toolIndex, 1)
+			}
 
-		// Stable ordering keeps diffs of version-controlled MCP configs minimal.
-		if (listName === "alwaysAllow") {
-			targetList.sort()
-		}
+			// Stable ordering keeps diffs of version-controlled MCP configs minimal.
+			if (listName === "alwaysAllow") {
+				targetList.sort()
+			}
 
-		// Set flag to prevent file watcher from triggering server restart
-		if (this.flagResetTimer) {
-			clearTimeout(this.flagResetTimer)
-		}
-		this.isProgrammaticUpdate = true
-		try {
-			await safeWriteJson(normalizedPath, config, { prettyPrint: true })
-		} finally {
-			// Reset flag after watcher debounce period (non-blocking)
-			this.flagResetTimer = setTimeout(() => {
-				this.isProgrammaticUpdate = false
-				this.flagResetTimer = undefined
-			}, 600)
+			// Set flag to prevent file watcher from triggering server restart
+			if (this.flagResetTimer) {
+				clearTimeout(this.flagResetTimer)
+			}
+			this.isProgrammaticUpdate = true
+			try {
+				await safeWriteJson(normalizedPath, config, { prettyPrint: true })
+			} finally {
+				// Reset flag after watcher debounce period (non-blocking)
+				this.flagResetTimer = setTimeout(() => {
+					this.isProgrammaticUpdate = false
+					this.flagResetTimer = undefined
+				}, 600)
+			}
 		}
 
 		if (connection) {

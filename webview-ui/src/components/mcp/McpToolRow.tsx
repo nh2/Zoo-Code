@@ -1,3 +1,4 @@
+import { useRef } from "react"
 import { VSCodeCheckbox } from "@vscode/webview-ui-toolkit/react"
 
 import type { McpTool } from "@roo-code/types"
@@ -17,15 +18,20 @@ type McpToolRowProps = {
 const McpToolRow = ({ tool, serverName, serverSource, alwaysAllowMcp, isInChatContext = false }: McpToolRowProps) => {
 	const { t } = useAppTranslation()
 	const isToolEnabled = tool.enabledForPrompt ?? true
+	const reportedAlwaysAllow = useRef(tool.alwaysAllow ?? false)
+	reportedAlwaysAllow.current = tool.alwaysAllow ?? false
 
-	const handleAlwaysAllowChange = () => {
+	const handleAlwaysAllowChange = (e: Event | React.FormEvent<HTMLElement>) => {
 		if (!serverName) return
+		const checked = (e.target as HTMLInputElement).checked
+		// `VSCodeCheckbox` also emits `change` when React sets `checked`, e.g. after an external mcp.json edit; echoing that would revert the edit.
+		if (checked === reportedAlwaysAllow.current) return
 		vscode.postMessage({
 			type: "toggleToolAlwaysAllow",
 			serverName,
 			source: serverSource || "global",
 			toolName: tool.name,
-			alwaysAllow: !tool.alwaysAllow,
+			alwaysAllow: checked,
 		})
 	}
 

@@ -33,11 +33,23 @@ vi.mock("@vscode/webview-ui-toolkit/react", () => ({
 	}: {
 		children?: React.ReactNode
 		checked?: boolean
-		onChange?: (e: React.ChangeEvent<HTMLInputElement>) => void
+		onChange?: (e: { target: { checked: boolean } }) => void
 	}) {
+		// Like the real `VSCodeCheckbox`, emit `change` when `checked` is set programmatically too.
+		const previousChecked = React.useRef(checked)
+		React.useEffect(() => {
+			if (previousChecked.current !== checked) {
+				previousChecked.current = checked
+				onChange?.({ target: { checked: checked ?? false } })
+			}
+		})
 		return (
 			<label>
-				<input type="checkbox" checked={checked} onChange={onChange} />
+				<input
+					type="checkbox"
+					checked={checked}
+					onChange={(e) => onChange?.({ target: { checked: e.target.checked } })}
+				/>
 				{children}
 			</label>
 		)
@@ -89,6 +101,34 @@ describe("McpToolRow", () => {
 			source: "global",
 		})
 	})
+
+	it("sends message to revoke always allow when a checked checkbox is clicked", () => {
+		render(<McpToolRow tool={{ ...mockTool, alwaysAllow: true }} serverName="test-server" alwaysAllowMcp={true} />)
+
+		fireEvent.click(screen.getByRole("checkbox"))
+
+		expect(vscode.postMessage).toHaveBeenCalledWith(
+			expect.objectContaining({ type: "toggleToolAlwaysAllow", alwaysAllow: false }),
+		)
+	})
+
+	it.each([true, false])(
+		"does not echo an externally changed always allow state (%s) back to the extension",
+		(alwaysAllow) => {
+			const { rerender } = render(
+				<McpToolRow
+					tool={{ ...mockTool, alwaysAllow: !alwaysAllow }}
+					serverName="test-server"
+					alwaysAllowMcp={true}
+				/>,
+			)
+
+			rerender(<McpToolRow tool={{ ...mockTool, alwaysAllow }} serverName="test-server" alwaysAllowMcp={true} />)
+
+			expect((screen.getByRole("checkbox") as HTMLInputElement).checked).toBe(alwaysAllow)
+			expect(vscode.postMessage).not.toHaveBeenCalled()
+		},
+	)
 
 	it("reflects always allow state in checkbox", () => {
 		const alwaysAllowedTool = {
