@@ -34,7 +34,7 @@ vi.mock("fs/promises", () => {
 	return { default: shared, ...shared }
 })
 
-// Import safeWriteJson to use in mocks
+import { safeWriteJson } from "../../../utils/safeWriteJson"
 
 // Mock safeWriteJson
 vi.mock("../../../utils/safeWriteJson", () => ({
@@ -1826,6 +1826,47 @@ describe("McpHub", () => {
 			expect(writtenConfig.mcpServers["test-server"].disabledTools).toBeDefined()
 			expect(writtenConfig.mcpServers["test-server"].disabledTools).toContain("new-tool")
 		})
+	})
+
+	describe("trailing newline preservation", () => {
+		const operations = [
+			{
+				name: "toggleToolAlwaysAllow",
+				run: () => mcpHub.toggleToolAlwaysAllow("test-server", "global", "new-tool", true),
+			},
+			{ name: "updateServerTimeout", run: () => mcpHub.updateServerTimeout("test-server", 120, "global") },
+		]
+
+		it.each(operations.flatMap((operation) => [true, false].map((hasNewline) => ({ ...operation, hasNewline }))))(
+			"$name should keep a trailing newline only if the file had one ($hasNewline)",
+			async ({ run, hasNewline }) => {
+				const serverConfig = { type: "stdio", command: "node", args: ["test.js"] }
+				const content = JSON.stringify({ mcpServers: { "test-server": serverConfig } }, null, "\t")
+				vi.mocked(fs.readFile).mockResolvedValueOnce(hasNewline ? `${content}\n` : content)
+
+				const mockConnection: DisconnectedMcpConnection = {
+					type: "disconnected",
+					server: {
+						name: "test-server",
+						config: JSON.stringify(serverConfig),
+						status: "disconnected",
+						source: "global",
+					},
+					client: null,
+					transport: null,
+				}
+				mcpHub.connections = [mockConnection]
+				vi.mocked(safeWriteJson).mockClear()
+
+				await run()
+
+				expect(safeWriteJson).toHaveBeenCalledWith(
+					expect.any(String),
+					expect.anything(),
+					expect.objectContaining({ trailingNewline: hasNewline }),
+				)
+			},
+		)
 	})
 
 	describe("server disabled state", () => {

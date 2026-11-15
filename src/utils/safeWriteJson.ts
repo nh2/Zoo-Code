@@ -18,6 +18,12 @@ export interface SafeWriteJsonOptions {
 	prettyPrint?: boolean
 
 	/**
+	 * Whether to end the file with a newline, e.g. to keep the convention of a file being updated.
+	 * @default false
+	 */
+	trailingNewline?: boolean
+
+	/**
 	 * When provided, the current file is read under the advisory lock
 	 * and passed to this function along with the incoming data. The
 	 * return value replaces `data` for the write. This turns a blind
@@ -99,7 +105,7 @@ async function safeWriteJson(filePath: string, data: any, options?: SafeWriteJso
 			`.${path.basename(absoluteFilePath)}.new_${Date.now()}_${Math.random().toString(36).substring(2)}.tmp`,
 		)
 
-		await _streamDataToFile(actualTempNewFilePath, data, options?.prettyPrint)
+		await _streamDataToFile(actualTempNewFilePath, data, options?.prettyPrint, options?.trailingNewline)
 
 		// Step 2: Check if the target file exists. If so, rename it to a backup path.
 		try {
@@ -207,9 +213,15 @@ async function safeWriteJson(filePath: string, data: any, options?: SafeWriteJso
  * @param targetPath The path to write the stream to.
  * @param data The data to stream.
  * @param prettyPrint Whether to format the JSON with indentation.
+ * @param trailingNewline Whether to end the file with a newline.
  * @returns Promise<void>
  */
-async function _streamDataToFile(targetPath: string, data: any, prettyPrint = false): Promise<void> {
+async function _streamDataToFile(
+	targetPath: string,
+	data: any,
+	prettyPrint = false,
+	trailingNewline = false,
+): Promise<void> {
 	// Stream data to avoid high memory usage for large JSON objects.
 	const fileWriteStream = fsSync.createWriteStream(targetPath, { encoding: "utf8" })
 
@@ -226,7 +238,14 @@ async function _streamDataToFile(targetPath: string, data: any, prettyPrint = fa
 		stringifyStream.on("error", reject)
 		fileWriteStream.on("error", reject)
 		fileWriteStream.on("finish", resolve)
-		stringifyStream.pipe(fileWriteStream)
+		stringifyStream.on("end", () => {
+			if (trailingNewline) {
+				fileWriteStream.end("\n")
+			} else {
+				fileWriteStream.end()
+			}
+		})
+		stringifyStream.pipe(fileWriteStream, { end: false })
 	})
 }
 

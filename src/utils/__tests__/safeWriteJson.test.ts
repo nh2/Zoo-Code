@@ -532,6 +532,19 @@ describe("safeWriteJson", () => {
 		expect(content).toEqual({ value: 1 })
 	})
 
+	test.each([
+		{ trailingNewline: true, expected: '{\n\t"a": 1\n}\n' },
+		{ trailingNewline: false, expected: '{\n\t"a": 1\n}' },
+		{ trailingNewline: undefined, expected: '{\n\t"a": 1\n}' },
+	])(
+		"should end the file with a newline only when trailingNewline is $trailingNewline",
+		async ({ trailingNewline, expected }) => {
+			await safeWriteJson(currentTestFilePath, { a: 1 }, { prettyPrint: true, trailingNewline })
+
+			expect(await fs.readFile(currentTestFilePath, "utf-8")).toBe(expected)
+		},
+	)
+
 	test("should write incoming data directly when no merge callback is provided", async () => {
 		const initial = { a: 1, b: 2 }
 		await safeWriteJson(currentTestFilePath, initial)
