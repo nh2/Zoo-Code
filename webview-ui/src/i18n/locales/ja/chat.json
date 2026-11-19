@@ -270,6 +270,16 @@
 		"expandManagement": "コマンド管理セクションを展開",
 		"collapseManagement": "コマンド管理セクションを折りたたむ"
 	},
+	"cancelWithReason": {
+		"menuTooltip": "その他の中止オプション",
+		"menuItem": "理由を付けて中止…",
+		"title": "理由を付けて中止",
+		"description": "処理を停止し、結果と一緒に理由をモデルに送信します。",
+		"placeholder": "なぜ中止しますか？代わりに何をすべきですか？",
+		"keepRunning": "実行を続ける",
+		"submit": "中止して送信",
+		"tooLate": "理由付きの中止は効果がありませんでした：すでに完了していました。理由はチャット入力欄に戻されました。"
+	},
 	"response": "応答",
 	"arguments": "引数",
 	"text": {

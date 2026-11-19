@@ -9,7 +9,11 @@ import { ExecuteCommandOptions } from "../ExecuteCommandTool"
 import { TerminalRegistry } from "../../../integrations/terminal/TerminalRegistry"
 import { Terminal } from "../../../integrations/terminal/Terminal"
 import { ExecaTerminal } from "../../../integrations/terminal/ExecaTerminal"
-import type { RooTerminalCallbacks } from "../../../integrations/terminal/types"
+import type {
+	ExitCodeDetails,
+	RooTerminalCallbacks,
+	RooTerminalProcess,
+} from "../../../integrations/terminal/types"
 const filesystemMocks = vitest.hoisted(() => ({
 	access: vitest.fn(),
 	stat: vitest.fn(),
@@ -59,6 +63,7 @@ describe("executeCommand", () => {
 			},
 			say: vitest.fn().mockResolvedValue(undefined),
 			terminalProcesses: new Map(),
+			reasonCancellableExecutions: new Map(),
 		}
 
 		// Create mock process that resolves immediately
@@ -431,6 +436,65 @@ describe("executeCommand", () => {
 			await executionB
 
 			expect(mockTask.terminalProcesses.size).toBe(0)
+		})
+
+		function runControllableCommand() {
+			let callbacks!: RooTerminalCallbacks
+			let finish!: () => void
+			const control = { continue: vitest.fn(), abort: vitest.fn() }
+			const pending = new Promise<void>((resolve) => {
+				finish = resolve
+			})
+			// The tool only awaits the process and calls continue()/abort() on it.
+			const process = Object.assign(pending, control) as unknown as RooTerminalProcess
+			mockTerminal.runCommand.mockImplementation((_command: string, cbs: RooTerminalCallbacks) => {
+				callbacks = cbs
+				return process
+			})
+			const complete = (output: string, details: ExitCodeDetails) => {
+				callbacks.onShellExecutionComplete(details, process)
+				void callbacks.onCompleted(output, process)
+				finish()
+			}
+			const execution = executeCommandInTerminal(mockTask, {
+				executionId: "exec-1",
+				toolCallId: "call-1",
+				command: "sleep 100",
+				terminalShellIntegrationDisabled: false,
+			})
+			return { process: control, complete, execution }
+		}
+
+		it("cancel with reason kills the command and hands the reason to the model", async () => {
+			const { process, complete, execution } = runControllableCommand()
+			await vitest.waitFor(() => expect(mockTask.reasonCancellableExecutions.has("exec-1")).toBe(true))
+			process.abort.mockImplementation(() => complete("partial output", { exitCode: undefined, signalName: "SIGINT" }))
+
+			expect(mockTask.reasonCancellableExecutions.get("exec-1")("use the other script")).toBe(true)
+			const [rejected, result] = await execution
+
+			expect(process.abort).toHaveBeenCalledTimes(1)
+			expect(rejected).toBe(true)
+			expect(result).toContain('"status":"cancelled_by_user","reason":"use the other script"')
+			expect(result).toContain("Process terminated by signal SIGINT")
+			expect(mockTask.say).toHaveBeenCalledWith("user_feedback", "use the other script")
+			expect(mockTask.reasonCancellableExecutions.size).toBe(0)
+		})
+
+		it("cancel with reason does nothing once the command has exited", async () => {
+			const { process, complete, execution } = runControllableCommand()
+			await vitest.waitFor(() => expect(mockTask.reasonCancellableExecutions.has("exec-1")).toBe(true))
+			const cancel = mockTask.reasonCancellableExecutions.get("exec-1")
+
+			complete("all done", { exitCode: 0 })
+			expect(cancel("too late")).toBe(false)
+			const [rejected, result] = await execution
+
+			expect(process.abort).not.toHaveBeenCalled()
+			expect(rejected).toBe(false)
+			expect(result).not.toContain("cancelled_by_user")
+			expect(mockTask.say).not.toHaveBeenCalledWith("user_feedback", "too late")
+			expect(mockTask.reasonCancellableExecutions.size).toBe(0)
 		})
 
 		it("posts timeout status when command execution exceeds the user limit", async () => {

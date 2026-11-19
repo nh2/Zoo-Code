@@ -2293,6 +2293,37 @@ describe("webviewMessageHandler - abortMcpExecution", () => {
 	})
 })
 
+describe("webviewMessageHandler - cancelExecutionWithReason", () => {
+	beforeEach(() => {
+		vi.clearAllMocks()
+	})
+
+	it.each([
+		[true, [{ type: "executionCancelResult", executionId: "42", success: true, text: "wrong dir" }]],
+		[
+			false,
+			[
+				{ type: "executionCancelResult", executionId: "42", success: false, text: "wrong dir" },
+				{ type: "invoke", invoke: "setChatBoxMessage", text: "wrong dir" },
+			],
+		],
+	])("reports cancelled=%s and hands a too-late reason back to the chat input", async (cancelled, posted) => {
+		const cancelExecutionWithReason = vi.fn().mockReturnValue(cancelled)
+		vi.mocked(mockClineProvider.getCurrentTask).mockReturnValue({
+			cancelExecutionWithReason,
+		} as Partial<Task> as Task)
+
+		await webviewMessageHandler(mockClineProvider, {
+			type: "cancelExecutionWithReason",
+			executionId: "42",
+			text: "  wrong dir ",
+		})
+
+		expect(cancelExecutionWithReason).toHaveBeenCalledWith("42", "wrong dir")
+		expect(vi.mocked(mockClineProvider.postMessageToWebview).mock.calls.map(([m]) => m)).toEqual(posted)
+	})
+})
+
 describe("webviewMessageHandler - requestCommands", () => {
 	beforeEach(() => {
 		vi.clearAllMocks()

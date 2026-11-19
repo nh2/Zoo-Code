@@ -443,6 +443,11 @@ export class Task extends EventEmitter<TaskEvents> implements TaskLike {
 	terminalProcesses = new Map<string, RooTerminalProcess>()
 	activeToolContexts = new Map<string, ToolExecutionContext>()
 	readonly mcpExecutionAbortControllers = new Map<string, AbortController>()
+	/**
+	 * Cancellers of running commands and MCP calls, keyed by execution id.
+	 * Each returns whether the cancellation took effect, i.e. the execution had not finished yet.
+	 */
+	readonly reasonCancellableExecutions = new Map<string, (reason: string) => boolean>()
 
 	// Editing
 	diffViewProvider: DiffViewProvider
@@ -2774,6 +2779,11 @@ export class Task extends EventEmitter<TaskEvents> implements TaskLike {
 		this.mcpExecutionAbortControllers.get(executionId)?.abort()
 	}
 
+	/** Returns false when the execution already finished, in which case nothing was cancelled. */
+	cancelExecutionWithReason(executionId: string, reason: string): boolean {
+		return this.reasonCancellableExecutions.get(executionId)?.(reason) ?? false
+	}
+
 	private async getFilesReadByRooSafely(context: string): Promise<string[] | undefined> {
 		try {
 			return await this.fileContextTracker.getFilesReadByRoo()
@@ -3875,6 +3885,7 @@ export class Task extends EventEmitter<TaskEvents> implements TaskLike {
 			controller.abort()
 		}
 		this.mcpExecutionAbortControllers.clear()
+		this.reasonCancellableExecutions.clear()
 
 		// Dispose message queue and remove event listeners.
 		try {

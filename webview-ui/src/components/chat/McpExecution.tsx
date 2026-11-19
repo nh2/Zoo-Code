@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState, memo } from "react"
-import { Server, ChevronDown, OctagonX } from "lucide-react"
+import { Server, ChevronDown } from "lucide-react"
 import { useEvent } from "react-use"
 import { useTranslation } from "react-i18next"
 
@@ -14,11 +14,12 @@ import { safeJsonParse } from "@roo/core"
 
 import { cn } from "@src/lib/utils"
 import { vscode } from "@src/utils/vscode"
-import { Button, StandardTooltip } from "@src/components/ui"
+import { Button } from "@src/components/ui"
 
 import CodeBlock from "../common/CodeBlock"
 import McpToolRow from "../mcp/McpToolRow"
 
+import { AbortButtonWithReason, CancelTooLateNotice } from "./CancelWithReason"
 import { Markdown } from "./Markdown"
 
 type CachedMcpExecution = { status: McpExecutionStatus; response: string }
@@ -241,17 +242,10 @@ export const McpExecution = ({
 									<div className="whitespace-nowrap">({status.error})</div>
 								)}
 								{status.status === "started" && (
-									<StandardTooltip content={t("chat:commandExecution.abort")}>
-										<Button
-											variant="ghost"
-											size="icon"
-											aria-label={t("chat:commandExecution.abort")}
-											onClick={() =>
-												vscode.postMessage({ type: "abortMcpExecution", executionId })
-											}>
-											<OctagonX className="size-4" />
-										</Button>
-									</StandardTooltip>
+									<AbortButtonWithReason
+										executionId={executionId}
+										onAbort={() => vscode.postMessage({ type: "abortMcpExecution", executionId })}
+									/>
 								)}
 							</div>
 						)}
@@ -267,6 +261,8 @@ export const McpExecution = ({
 					</div>
 				</div>
 			</div>
+
+			<CancelTooLateNotice executionId={executionId} />
 
 			<div className="w-full bg-vscode-editor-background rounded-xs p-2">
 				{/* Tool information section */}

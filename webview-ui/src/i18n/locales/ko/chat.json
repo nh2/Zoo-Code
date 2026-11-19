@@ -270,6 +270,16 @@
 		"expandManagement": "명령 관리 섹션 확장",
 		"collapseManagement": "명령 관리 섹션 축소"
 	},
+	"cancelWithReason": {
+		"menuTooltip": "추가 중단 옵션",
+		"menuItem": "이유와 함께 중단…",
+		"title": "이유와 함께 중단",
+		"description": "실행을 멈추고 결과와 함께 이유를 모델에 보냅니다.",
+		"placeholder": "왜 중단하나요? 대신 무엇을 해야 하나요?",
+		"keepRunning": "계속 실행",
+		"submit": "중단하고 보내기",
+		"tooLate": "이유와 함께 중단이 적용되지 않았습니다: 이미 완료되었습니다. 이유는 채팅 입력란에 다시 넣었습니다."
+	},
 	"response": "응답",
 	"arguments": "인수",
 	"text": {

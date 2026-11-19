@@ -112,6 +112,7 @@ describe("executeCommandTool", () => {
 			recordToolError: vitest.fn(),
 			supersedePendingAsk: vitest.fn(),
 			terminalProcesses: new Map(),
+			reasonCancellableExecutions: new Map(),
 			recordBlanketCommandDenial: vitest.fn(),
 			commandAllowlist: new TaskCommandAllowlist(),
 			providerRef: {

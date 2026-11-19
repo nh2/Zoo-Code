@@ -271,6 +271,16 @@
 		"expandManagement": "展开命令管理部分",
 		"collapseManagement": "折叠命令管理部分"
 	},
+	"cancelWithReason": {
+		"menuTooltip": "更多中止选项",
+		"menuItem": "附带原因中止…",
+		"title": "附带原因中止",
+		"description": "这会停止执行，并将你的原因与结果一起发送给模型。",
+		"placeholder": "为什么要中止？应该改做什么？",
+		"keepRunning": "继续运行",
+		"submit": "中止并发送",
+		"tooLate": "附带原因的中止未生效：它已经结束了。你的原因已放回聊天输入框。"
+	},
 	"response": "响应",
 	"arguments": "参数",
 	"text": {

@@ -70,6 +70,7 @@ export interface ExtensionMessage {
 		| "setHistoryPreviewCollapsed"
 		| "commandExecutionStatus"
 		| "mcpExecutionStatus"
+		| "executionCancelResult"
 		| "vsCodeSetting"
 		| "terminalProfiles"
 		| "authenticatedUser"
@@ -168,6 +169,7 @@ export interface ExtensionMessage {
 	customMode?: ModeConfig
 	slug?: string
 	success?: boolean
+	executionId?: string // For executionCancelResult
 	/** Generic payload for extension messages that use `values` */
 	// eslint-disable-next-line @typescript-eslint/no-explicit-any
 	values?: Record<string, any>
@@ -501,6 +503,7 @@ export interface WebviewMessage {
 		| "revokeTaskAllowedCommand"
 		| "terminalOperation"
 		| "abortMcpExecution"
+		| "cancelExecutionWithReason"
 		| "clearTask"
 		| "didShowAnnouncement"
 		| "selectImages"
@@ -734,7 +737,7 @@ export interface WebviewMessage {
 	themeFixture?: WebviewThemeFixture
 	ids?: string[]
 	terminalOperation?: "continue" | "abort"
-	executionId?: string // For abortMcpExecution
+	executionId?: string // For abortMcpExecution and cancelExecutionWithReason
 	messageTs?: number
 	messageId?: string
 	restoreCheckpoint?: boolean

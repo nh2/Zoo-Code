@@ -271,6 +271,16 @@
 		"expandManagement": "Komut yönetimi bölümünü genişlet",
 		"collapseManagement": "Komut yönetimi bölümünü daralt"
 	},
+	"cancelWithReason": {
+		"menuTooltip": "Diğer iptal seçenekleri",
+		"menuItem": "Gerekçeyle iptal et…",
+		"title": "Gerekçeyle iptal et",
+		"description": "Bu işlemi durdurur ve gerekçeni sonuçla birlikte modele gönderir.",
+		"placeholder": "Neden iptal ediyorsun? Bunun yerine ne olmalı?",
+		"keepRunning": "Çalışmaya devam etsin",
+		"submit": "İptal et ve gönder",
+		"tooLate": "Gerekçeyle iptal etkisiz kaldı: işlem zaten bitmişti. Gerekçen sohbet giriş alanına geri kondu."
+	},
 	"response": "Yanıt",
 	"arguments": "Argümanlar",
 	"text": {

@@ -1,7 +1,7 @@
 import { useCallback, useState, memo, useMemo } from "react"
 import { useEvent } from "react-use"
 import { t } from "i18next"
-import { ChevronDown, OctagonX } from "lucide-react"
+import { ChevronDown } from "lucide-react"
 
 import {
 	type ExtensionMessage,
@@ -22,6 +22,7 @@ import { cn } from "@src/lib/utils"
 import { Button, StandardTooltip } from "@src/components/ui"
 import CodeBlock from "@src/components/common/CodeBlock"
 
+import { AbortButtonWithReason, CancelTooLateNotice } from "./CancelWithReason"
 import { CommandPatternSelector } from "./CommandPatternSelector"
 import { TerminalOutput } from "./TerminalOutput"
 
@@ -220,19 +221,15 @@ export const CommandExecution = ({ executionId, text, icon, title, isDenied = fa
 						{status?.status === "started" && (
 							<div className="flex flex-row items-center gap-2 font-mono text-xs">
 								{status.pid && <div className="whitespace-nowrap">(PID: {status.pid})</div>}
-								<StandardTooltip content={t("chat:commandExecution.abort")}>
-									<Button
-										variant="ghost"
-										size="icon"
-										onClick={() =>
-											vscode.postMessage({
-												type: "terminalOperation",
-												terminalOperation: "abort",
-											})
-										}>
-										<OctagonX className="size-4" />
-									</Button>
-								</StandardTooltip>
+								<AbortButtonWithReason
+									executionId={executionId}
+									onAbort={() =>
+										vscode.postMessage({
+											type: "terminalOperation",
+											terminalOperation: "abort",
+										})
+									}
+								/>
 							</div>
 						)}
 						{output.length > 0 && (
@@ -248,6 +245,8 @@ export const CommandExecution = ({ executionId, text, icon, title, isDenied = fa
 					</div>
 				</div>
 			</div>
+
+			<CancelTooLateNotice executionId={executionId} />
 
 			<div className="bg-vscode-editor-background border border-vscode-border rounded-xs ml-6 mt-2">
 				<div className="p-2">

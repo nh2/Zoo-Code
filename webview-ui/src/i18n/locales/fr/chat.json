@@ -270,6 +270,16 @@
 		"expandManagement": "Développer la section de gestion des commandes",
 		"collapseManagement": "Réduire la section de gestion des commandes"
 	},
+	"cancelWithReason": {
+		"menuTooltip": "Plus d'options d'abandon",
+		"menuItem": "Abandonner avec une raison…",
+		"title": "Abandonner avec une raison",
+		"description": "Cela l'arrête et envoie ta raison au modèle avec le résultat.",
+		"placeholder": "Pourquoi abandonnes-tu ? Que devrait-il se passer à la place ?",
+		"keepRunning": "Laisser tourner",
+		"submit": "Abandonner et envoyer",
+		"tooLate": "L'abandon avec raison n'a eu aucun effet : c'était déjà terminé. Ta raison a été remise dans le champ de saisie du chat."
+	},
 	"response": "Réponse",
 	"arguments": "Arguments",
 	"text": {

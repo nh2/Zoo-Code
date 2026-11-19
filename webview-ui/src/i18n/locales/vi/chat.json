@@ -271,6 +271,16 @@
 		"expandManagement": "Mở rộng phần quản lý lệnh",
 		"collapseManagement": "Thu gọn phần quản lý lệnh"
 	},
+	"cancelWithReason": {
+		"menuTooltip": "Thêm tùy chọn hủy",
+		"menuItem": "Hủy kèm lý do…",
+		"title": "Hủy kèm lý do",
+		"description": "Thao tác này dừng lại và gửi lý do của bạn cho mô hình cùng với kết quả.",
+		"placeholder": "Tại sao bạn hủy? Thay vào đó nên làm gì?",
+		"keepRunning": "Tiếp tục chạy",
+		"submit": "Hủy và gửi",
+		"tooLate": "Hủy kèm lý do không có tác dụng: tác vụ đã hoàn tất. Lý do của bạn đã được đưa lại vào ô nhập chat."
+	},
 	"response": "Phản hồi",
 	"arguments": "Tham số",
 	"text": {

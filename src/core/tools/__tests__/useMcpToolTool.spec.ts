@@ -14,6 +14,7 @@ vi.mock("../../prompts/responses", () => ({
 			return `Tool result: ${result}`
 		}),
 		toolError: vi.fn((error: string) => `Tool error: ${error}`),
+		toolCancelledByUser: vi.fn((reason: string, result: string) => `Cancelled (${reason}): ${result}`),
 		invalidMcpToolArgumentError: vi.fn((server: string, tool: string) => `Invalid args for ${server}:${tool}`),
 		unknownMcpToolError: vi.fn((server: string, tool: string, availableTools: string[]) => {
 			const toolsList = availableTools.length > 0 ? availableTools.join(", ") : "No tools available"
@@ -72,6 +73,8 @@ describe("useMcpToolTool", () => {
 			lastMessageTs: 123456789,
 			providerRef: mockProviderRef,
 			mcpExecutionAbortControllers: new Map(),
+			reasonCancellableExecutions: new Map(),
+			activeToolContexts: new Map(),
 		}
 	})
 
@@ -1060,6 +1063,54 @@ describe("useMcpToolTool", () => {
 
 			mockTask.mcpExecutionAbortControllers!.get("111")!.abort()
 			await run
+		})
+
+		const callbacks = () => ({
+			askApproval: mockAskApproval,
+			handleError: mockHandleError,
+			pushToolResult: mockPushToolResult,
+			toolCallId: "test-tool-call-id",
+		})
+
+		it("cancel with reason aborts the call, tells the model why, and rejects the tool", async () => {
+			const { callToolMock } = setupHangingCallTool()
+
+			const run = useMcpToolTool.handle(mockTask as Task, block, callbacks())
+			await vi.waitFor(() => expect(callToolMock).toHaveBeenCalled())
+
+			expect(mockTask.reasonCancellableExecutions!.get("123456789")!("wrong server")).toBe(true)
+			await run
+
+			expect(mockTask.reasonCancellableExecutions!.size).toBe(0)
+			expect(mockTask.say).toHaveBeenCalledWith("user_feedback", "wrong server")
+			expect(mockPushToolResult).toHaveBeenCalledWith(
+				"Cancelled (wrong server): The user aborted this MCP tool call before it completed.",
+			)
+			expect(mockTask.didRejectTool).toBe(true)
+		})
+
+		it("cancel with reason reports the reason even when the result settled in the same tick", async () => {
+			const { callToolMock } = setupHangingCallTool()
+			callToolMock.mockImplementationOnce(() => {
+				expect(mockTask.reasonCancellableExecutions!.get("123456789")!("too slow")).toBe(true)
+				return Promise.resolve({ content: [{ type: "text", text: "late result" }] })
+			})
+
+			await useMcpToolTool.handle(mockTask as Task, block, callbacks())
+
+			expect(mockPushToolResult).toHaveBeenCalledTimes(1)
+			expect(mockPushToolResult).toHaveBeenCalledWith(expect.stringContaining("Cancelled (too slow)"))
+		})
+
+		it("offers no canceller once the call has finished", async () => {
+			const { callToolMock } = setupHangingCallTool()
+			callToolMock.mockResolvedValueOnce({ content: [{ type: "text", text: "done" }] })
+
+			await useMcpToolTool.handle(mockTask as Task, block, callbacks())
+
+			expect(mockTask.reasonCancellableExecutions!.size).toBe(0)
+			expect(mockPushToolResult).toHaveBeenCalledWith("Tool result: done")
+			expect(mockTask.didRejectTool).toBeUndefined()
 		})
 
 		it("still routes non-abort failures to handleError and unregisters the controller", async () => {

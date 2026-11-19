@@ -50,6 +50,10 @@ export const formatResponse = {
 	commandAllowForTaskRevoked: (command: string, cwd: string) =>
 		`<task_command_allowlist_update>The user revoked the allowance to run \`${command}\` in working directory '${cwd}' without approval. Running it again will ask the user for approval.</task_command_allowlist_update>`,
 
+	/** Prefixes the result of a command or MCP call the user cancelled while it ran. */
+	toolCancelledByUser: (reason: string, result: string) =>
+		`${JSON.stringify({ status: "cancelled_by_user", reason })}\n\n${result}`,
+
 	toolApprovedWithFeedback: (feedback?: string) =>
 		JSON.stringify({
 			status: "approved",

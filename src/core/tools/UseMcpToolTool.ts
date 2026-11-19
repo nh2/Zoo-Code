@@ -1,6 +1,7 @@
 import type { ClineAskUseMcpServer, McpExecutionStatus, McpResourceLink } from "@roo-code/types"
 
 import { Task } from "../task/Task"
+import { markToolRejected } from "../task/toolExecutionContext"
 import type { McpHub } from "../../services/mcp/McpHub"
 import { formatResponse } from "../prompts/responses"
 import { t } from "../../i18n"
@@ -42,7 +43,7 @@ export class UseMcpToolTool extends BaseTool<"use_mcp_tool"> {
 	readonly name = "use_mcp_tool" as const
 
 	async execute(params: UseMcpToolParams, task: Task, callbacks: UseMcpToolCallbacks): Promise<void> {
-		const { askApproval, handleError, pushToolResult, onValidated } = callbacks
+		const { askApproval, handleError, pushToolResult, onValidated, toolCallId } = callbacks
 
 		try {
 			// Validate parameters
@@ -111,6 +112,7 @@ export class UseMcpToolTool extends BaseTool<"use_mcp_tool"> {
 				parsedArguments,
 				executionId,
 				pushToolResult,
+				toolCallId,
 			)
 		} catch (error) {
 			await handleError("executing MCP tool", error as Error)
@@ -348,6 +350,7 @@ export class UseMcpToolTool extends BaseTool<"use_mcp_tool"> {
 		parsedArguments: Record<string, unknown> | undefined,
 		executionId: string,
 		pushToolResult: (content: string | Array<any>) => void,
+		toolCallId: string,
 	): Promise<void> {
 		await task.say("mcp_server_request_started")
 
@@ -361,6 +364,15 @@ export class UseMcpToolTool extends BaseTool<"use_mcp_tool"> {
 
 		const abortController = new AbortController()
 		task.mcpExecutionAbortControllers.set(executionId, abortController)
+		let userCancelReason: string | undefined
+		task.reasonCancellableExecutions.set(executionId, (reason) => {
+			if (abortController.signal.aborted) {
+				return false
+			}
+			userCancelReason = reason
+			abortController.abort()
+			return true
+		})
 
 		// Unspecified source: McpHub prefers a project server over a global one with the same name.
 		const serverSource: "global" | "project" | undefined = undefined
@@ -375,12 +387,31 @@ export class UseMcpToolTool extends BaseTool<"use_mcp_tool"> {
 			if (!abortController.signal.aborted) {
 				throw error
 			}
-			await this.sendExecutionStatus(task, { executionId, status: "error", error: "Aborted by user" })
-			await task.say("mcp_server_response", "(Aborted by user)")
-			pushToolResult(formatResponse.toolError("The user aborted this MCP tool call before it completed."))
-			return
 		} finally {
 			task.mcpExecutionAbortControllers.delete(executionId)
+			task.reasonCancellableExecutions.delete(executionId)
+		}
+
+		// A result that settled in the same tick as the abort still counts as
+		// aborted: the user was told the cancellation took effect.
+		if (abortController.signal.aborted) {
+			await this.sendExecutionStatus(task, { executionId, status: "error", error: "Aborted by user" })
+			await task.say("mcp_server_response", "(Aborted by user)")
+			if (userCancelReason === undefined) {
+				pushToolResult(formatResponse.toolError("The user aborted this MCP tool call before it completed."))
+			} else {
+				if (userCancelReason) {
+					await task.say("user_feedback", userCancelReason)
+				}
+				markToolRejected(task, toolCallId)
+				pushToolResult(
+					formatResponse.toolCancelledByUser(
+						userCancelReason,
+						"The user aborted this MCP tool call before it completed.",
+					),
+				)
+			}
+			return
 		}
 
 		let toolResultPretty = "(No response)"

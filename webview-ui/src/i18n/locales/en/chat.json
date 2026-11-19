@@ -316,6 +316,16 @@
 		"expandManagement": "Expand command management section",
 		"collapseManagement": "Collapse command management section"
 	},
+	"cancelWithReason": {
+		"menuTooltip": "More abort options",
+		"menuItem": "Abort with reason…",
+		"title": "Abort with reason",
+		"description": "This stops it and sends your reason to the model together with the result.",
+		"placeholder": "Why are you aborting? What should happen instead?",
+		"keepRunning": "Keep running",
+		"submit": "Abort and send",
+		"tooLate": "Abort with reason had no effect: it had already finished. Your reason was put back into the chat input."
+	},
 	"response": "Response",
 	"arguments": "Arguments",
 	"text": {

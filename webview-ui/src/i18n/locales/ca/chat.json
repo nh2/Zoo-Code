@@ -270,6 +270,16 @@
 		"expandManagement": "Amplia la secció de gestió de comandaments",
 		"collapseManagement": "Redueix la secció de gestió de comandaments"
 	},
+	"cancelWithReason": {
+		"menuTooltip": "Més opcions d'avortament",
+		"menuItem": "Avorta amb motiu…",
+		"title": "Avorta amb motiu",
+		"description": "Això l'atura i envia el teu motiu al model juntament amb el resultat.",
+		"placeholder": "Per què avortes? Què hauria de passar en canvi?",
+		"keepRunning": "Deixa'l continuar",
+		"submit": "Avorta i envia",
+		"tooLate": "Avortar amb motiu no ha tingut cap efecte: ja havia acabat. El teu motiu s'ha tornat a posar al camp d'entrada del xat."
+	},
 	"response": "Resposta",
 	"arguments": "Arguments",
 	"text": {

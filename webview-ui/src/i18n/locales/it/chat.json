@@ -270,6 +270,16 @@
 		"expandManagement": "Espandi sezione gestione comandi",
 		"collapseManagement": "Comprimi sezione gestione comandi"
 	},
+	"cancelWithReason": {
+		"menuTooltip": "Altre opzioni di interruzione",
+		"menuItem": "Interrompi con motivo…",
+		"title": "Interrompi con motivo",
+		"description": "Lo interrompe e invia il tuo motivo al modello insieme al risultato.",
+		"placeholder": "Perché interrompi? Cosa dovrebbe succedere invece?",
+		"keepRunning": "Lascia in esecuzione",
+		"submit": "Interrompi e invia",
+		"tooLate": "L'interruzione con motivo non ha avuto effetto: era già terminato. Il tuo motivo è stato rimesso nel campo di input della chat."
+	},
 	"response": "Risposta",
 	"arguments": "Argomenti",
 	"text": {

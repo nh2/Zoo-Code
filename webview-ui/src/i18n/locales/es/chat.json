@@ -270,6 +270,16 @@
 		"expandManagement": "Expandir la sección de administración de comandos",
 		"collapseManagement": "Colapsar la sección de administración de comandos"
 	},
+	"cancelWithReason": {
+		"menuTooltip": "Más opciones de cancelación",
+		"menuItem": "Abortar con motivo…",
+		"title": "Abortar con motivo",
+		"description": "Esto lo detiene y envía tu motivo al modelo junto con el resultado.",
+		"placeholder": "¿Por qué abortas? ¿Qué debería pasar en su lugar?",
+		"keepRunning": "Dejar en ejecución",
+		"submit": "Abortar y enviar",
+		"tooLate": "Abortar con motivo no tuvo efecto: ya había terminado. Tu motivo se ha vuelto a poner en el campo de entrada del chat."
+	},
 	"response": "Respuesta",
 	"arguments": "Argumentos",
 	"text": {

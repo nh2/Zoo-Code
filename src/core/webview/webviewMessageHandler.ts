@@ -899,6 +899,23 @@ export const webviewMessageHandler = async (
 				provider.getCurrentTask()?.abortMcpExecution(message.executionId)
 			}
 			break
+		case "cancelExecutionWithReason":
+			if (message.executionId) {
+				const reason = message.text?.trim() ?? ""
+				const cancelled =
+					provider.getCurrentTask()?.cancelExecutionWithReason(message.executionId, reason) ?? false
+				await provider.postMessageToWebview({
+					type: "executionCancelResult",
+					executionId: message.executionId,
+					success: cancelled,
+					text: reason,
+				})
+				// The reason would otherwise be lost; hand it back so the user can still send it.
+				if (!cancelled && reason) {
+					await provider.postMessageToWebview({ type: "invoke", invoke: "setChatBoxMessage", text: reason })
+				}
+			}
+			break
 		case "clearTask":
 			// Clear task resets the current session. Delegation flows are
 			// handled via metadata; parent resumption occurs through

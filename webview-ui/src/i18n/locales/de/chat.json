@@ -270,6 +270,16 @@
 		"expandManagement": "Befehlsverwaltungsbereich erweitern",
 		"collapseManagement": "Befehlsverwaltungsbereich reduzieren"
 	},
+	"cancelWithReason": {
+		"menuTooltip": "Weitere Abbruchoptionen",
+		"menuItem": "Mit Begründung abbrechen…",
+		"title": "Mit Begründung abbrechen",
+		"description": "Das stoppt den Vorgang und schickt deine Begründung zusammen mit dem Ergebnis an das Modell.",
+		"placeholder": "Warum brichst du ab? Was soll stattdessen passieren?",
+		"keepRunning": "Weiterlaufen lassen",
+		"submit": "Abbrechen und senden",
+		"tooLate": "Abbruch mit Begründung hatte keine Wirkung: Der Vorgang war bereits beendet. Deine Begründung wurde wieder ins Chat-Eingabefeld eingefügt."
+	},
 	"response": "Antwort",
 	"arguments": "Argumente",
 	"text": {

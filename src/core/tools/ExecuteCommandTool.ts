@@ -663,6 +663,25 @@ export async function executeCommandInTerminal(
 	const process = terminal.runCommand(command, callbacks)
 	task.terminalProcesses.set(toolCallId, process)
 
+	let userCancelReason: string | undefined
+	task.reasonCancellableExecutions.set(executionId, (reason) => {
+		if (completed || exitDetails || runInBackground || userCancelReason !== undefined) {
+			return false
+		}
+		userCancelReason = reason
+		process.abort()
+		return true
+	})
+	const withUserCancellation = async (output: string): Promise<[boolean, ToolResponse]> => {
+		if (userCancelReason === undefined) {
+			return [false, output]
+		}
+		if (userCancelReason) {
+			await task.say("user_feedback", userCancelReason)
+		}
+		return [true, formatResponse.toolCancelledByUser(userCancelReason, output)]
+	}
+
 	// Dual-timeout logic:
 	// - Agent timeout: transitions the command to background (continues running)
 	// - User timeout: aborts the command (kills it)
@@ -720,6 +739,7 @@ export async function executeCommandInTerminal(
 		clearTimeout(userTimeoutId)
 		clearTimeout(pendingCommandOutputEmitTimer)
 		task.terminalProcesses.delete(toolCallId)
+		task.reasonCancellableExecutions.delete(executionId)
 	}
 
 	if (shellIntegrationError) {
@@ -747,7 +767,7 @@ export async function executeCommandInTerminal(
 
 		// Use persisted output format when output was truncated and spilled to disk
 		if (persistedResult?.truncated) {
-			return [false, formatPersistedOutput(persistedResult, exitDetails, currentWorkingDir)]
+			return withUserCancellation(formatPersistedOutput(persistedResult, exitDetails, currentWorkingDir))
 		}
 
 		// Use inline format for small outputs (original behavior with exit status).
@@ -759,19 +779,17 @@ export async function executeCommandInTerminal(
 
 		const exitStatus = formatExitStatus(exitDetails)
 
-		return [
-			false,
+		return withUserCancellation(
 			`Command executed in terminal within working directory '${currentWorkingDir}'. ${exitStatus}\nOutput:\n${result}`,
-		]
+		)
 	} else {
-		return [
-			false,
+		return withUserCancellation(
 			[
 				`Command is still running in terminal ${workingDir ? ` from '${workingDir.toPosix()}'` : ""}.`,
 				result.length > 0 ? `Here's the output so far:\n${result}\n` : "\n",
 				"You will be updated on the terminal status and new output in the future.",
 			].join("\n"),
-		]
+		)
 	}
 }
 
