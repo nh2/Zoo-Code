@@ -3,7 +3,7 @@ import { useEvent } from "react-use"
 import DynamicTextArea from "react-textarea-autosize"
 import { VolumeX, Image, WandSparkles, SendHorizontal, X, ListEnd, Square } from "lucide-react"
 
-import type { ExtensionMessage } from "@roo-code/types"
+import { MAX_IMAGE_BASE64_LENGTH, type ExtensionMessage } from "@roo-code/types"
 
 import { mentionRegex, mentionRegexGlobal, commandRegexGlobal, unescapeSpaces } from "@roo/context-mentions"
 import { WebviewMessage } from "@roo/WebviewMessage"
@@ -22,6 +22,7 @@ import {
 } from "@src/utils/context-mentions"
 import { cn } from "@src/lib/utils"
 import { convertToMentionPath } from "@src/utils/path-mentions"
+import { shrinkImageDataUrl, type ShrunkImage } from "@src/utils/imageUtils"
 import { StandardTooltip } from "@src/components/ui"
 
 import Thumbnails from "../common/Thumbnails"
@@ -283,6 +284,36 @@ export const ChatTextArea = forwardRef<HTMLTextAreaElement, ChatTextAreaProps>(
 		}, [normalizedInputValue, setInputValue, t])
 
 		const allModes = useMemo(() => getAllModes(customModes), [customModes])
+
+		const [imageSizeNotice, setImageSizeNotice] = useState<string | null>(null)
+
+		useEffect(() => {
+			if (selectedImages.length === 0) {
+				setImageSizeNotice(null)
+			}
+		}, [selectedImages.length])
+
+		const shrinkOversizedImages = useCallback(
+			async (dataUrls: (string | null)[]): Promise<string[]> => {
+				const results = await Promise.all(
+					dataUrls
+						.filter((dataUrl): dataUrl is string => dataUrl !== null)
+						.map((dataUrl) => shrinkImageDataUrl(dataUrl)),
+				)
+				const maxMB = MAX_IMAGE_BASE64_LENGTH / (1024 * 1024)
+				const resizedCount = results.filter((result) => result?.resized).length
+				const droppedCount = results.filter((result) => result === null).length
+				const notices = [
+					resizedCount > 0 ? t("chat:imagesDownscaled", { count: resizedCount, maxMB }) : null,
+					droppedCount > 0 ? t("chat:imagesTooLarge", { count: droppedCount, maxMB }) : null,
+				].filter((notice): notice is string => notice !== null)
+				if (notices.length > 0) {
+					setImageSizeNotice(notices.join(" "))
+				}
+				return results.filter((result): result is ShrunkImage => result !== null).map((r) => r.dataUrl)
+			},
+			[t],
+		)
 
 		// Memoized check for whether the input has content (text or images)
 		const hasInputContent = useMemo(() => {
@@ -762,7 +793,7 @@ export const ChatTextArea = forwardRef<HTMLTextAreaElement, ChatTextAreaProps>(
 					})
 
 					const imageDataArray = await Promise.all(imagePromises)
-					const dataUrls = imageDataArray.filter((dataUrl): dataUrl is string => dataUrl !== null)
+					const dataUrls = await shrinkOversizedImages(imageDataArray)
 
 					if (dataUrls.length > 0) {
 						setSelectedImages((prevImages) => [...prevImages, ...dataUrls].slice(0, MAX_IMAGES_PER_MESSAGE))
@@ -771,7 +802,15 @@ export const ChatTextArea = forwardRef<HTMLTextAreaElement, ChatTextAreaProps>(
 					}
 				}
 			},
-			[shouldDisableImages, setSelectedImages, cursorPosition, setInputValue, normalizedInputValue, t],
+			[
+				shouldDisableImages,
+				setSelectedImages,
+				cursorPosition,
+				setInputValue,
+				normalizedInputValue,
+				shrinkOversizedImages,
+				t,
+			],
 		)
 
 		const handleMenuMouseDown = useCallback(() => {
@@ -914,7 +953,7 @@ export const ChatTextArea = forwardRef<HTMLTextAreaElement, ChatTextAreaProps>(
 						})
 
 						const imageDataArray = await Promise.all(imagePromises)
-						const dataUrls = imageDataArray.filter((dataUrl): dataUrl is string => dataUrl !== null)
+						const dataUrls = await shrinkOversizedImages(imageDataArray)
 
 						if (dataUrls.length > 0) {
 							setSelectedImages((prevImages) =>
@@ -939,6 +978,7 @@ export const ChatTextArea = forwardRef<HTMLTextAreaElement, ChatTextAreaProps>(
 				setIntendedCursorPosition,
 				shouldDisableImages,
 				setSelectedImages,
+				shrinkOversizedImages,
 				t,
 			],
 		)
@@ -1318,6 +1358,12 @@ export const ChatTextArea = forwardRef<HTMLTextAreaElement, ChatTextAreaProps>(
 							marginBottom: 0,
 						}}
 					/>
+				)}
+
+				{imageSizeNotice && (
+					<div role="status" className="text-xs text-vscode-descriptionForeground px-1">
+						{imageSizeNotice}
+					</div>
 				)}
 
 				<div className="flex items-center gap-2">

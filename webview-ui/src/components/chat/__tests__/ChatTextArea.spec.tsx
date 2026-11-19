@@ -5,6 +5,7 @@ import { render, fireEvent, screen, act } from "@src/utils/test-utils"
 import { useExtensionState } from "@src/context/ExtensionStateContext"
 import { vscode } from "@src/utils/vscode"
 import * as pathMentions from "@src/utils/path-mentions"
+import * as imageUtils from "@src/utils/imageUtils"
 
 import { ChatTextArea } from "../ChatTextArea"
 
@@ -26,9 +27,14 @@ vi.mock("@src/utils/path-mentions", () => ({
 		return path
 	}),
 }))
+vi.mock("@src/utils/imageUtils", async (importOriginal) => ({
+	...(await importOriginal<typeof import("@src/utils/imageUtils")>()),
+	shrinkImageDataUrl: vi.fn(),
+}))
 
 // Get the mocked postMessage function
 const mockPostMessage = vscode.postMessage as ReturnType<typeof vi.fn>
+const mockShrinkImageDataUrl = vi.mocked(imageUtils.shrinkImageDataUrl)
 const mockConvertToMentionPath = pathMentions.convertToMentionPath as ReturnType<typeof vi.fn>
 
 // Mock ExtensionStateContext
@@ -1439,6 +1445,40 @@ describe("ChatTextArea", () => {
 
 			// removeMention finds no mention at the cursor, so the input is untouched.
 			expect(defaultProps.setInputValue).not.toHaveBeenCalled()
+		})
+
+		it.each([
+			{
+				result: { dataUrl: "data:image/png;base64,small", resized: true },
+				added: true,
+				notice: "imagesDownscaled",
+			},
+			{ result: null, added: false, notice: "imagesTooLarge" },
+		])("tells the user when a pasted image is $notice", async ({ result, added, notice }) => {
+			mockShrinkImageDataUrl.mockResolvedValue(result)
+			const setSelectedImages = vi.fn()
+			const { container } = render(<ChatTextArea {...defaultProps} setSelectedImages={setSelectedImages} />)
+			const textarea = getTextarea(container)
+
+			const pasteEvent = new window.Event("paste", { bubbles: true, cancelable: true })
+			Object.defineProperty(pasteEvent, "clipboardData", {
+				value: {
+					items: [{ type: "image/png", getAsFile: () => new Blob(["png"], { type: "image/png" }) }],
+					getData: () => "",
+				},
+			})
+			act(() => {
+				textarea.dispatchEvent(pasteEvent)
+			})
+
+			expect((await screen.findByRole("status")).textContent).toContain(notice)
+			expect(mockShrinkImageDataUrl).toHaveBeenCalledWith(expect.stringMatching(/^data:image\/png;base64,/))
+			if (added) {
+				const update = setSelectedImages.mock.calls[0][0] as (prev: string[]) => string[]
+				expect(update([])).toEqual(["data:image/png;base64,small"])
+			} else {
+				expect(setSelectedImages).not.toHaveBeenCalled()
+			}
 		})
 
 		it("adds a trailing space after a pasted URL", () => {

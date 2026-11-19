@@ -1,10 +1,10 @@
 // npx vitest run api/transform/__tests__/image-cleaning.spec.ts
 
-import type { ModelInfo } from "@roo-code/types"
+import { MAX_IMAGE_BASE64_LENGTH, type ModelInfo } from "@roo-code/types"
 
 import { ApiHandler } from "../../index"
 import { ApiMessage } from "../../../core/task-persistence/apiMessages"
-import { maybeRemoveImageBlocks } from "../image-cleaning"
+import { maybeRemoveImageBlocks, oversizedImagePlaceholder } from "../image-cleaning"
 
 describe("maybeRemoveImageBlocks", () => {
 	// Mock ApiHandler factory function
@@ -340,5 +340,60 @@ describe("maybeRemoveImageBlocks", () => {
 			},
 		])
 		expect(apiHandler.getModel).toHaveBeenCalled()
+	})
+
+	describe("oversized images", () => {
+		const imageBlock = (length: number) => ({
+			type: "image" as const,
+			source: { type: "base64" as const, media_type: "image/png" as const, data: "A".repeat(length) },
+		})
+
+		it.each([
+			{ length: MAX_IMAGE_BASE64_LENGTH, kept: true },
+			{ length: MAX_IMAGE_BASE64_LENGTH + 4, kept: false },
+		])("keeps=$kept for a base64 payload of $length characters", ({ length, kept }) => {
+			const image = imageBlock(length)
+			const messages: ApiMessage[] = [{ role: "user", content: [{ type: "text", text: "Look:" }, image] }]
+
+			const result = maybeRemoveImageBlocks(messages, createMockApiHandler(true))
+
+			expect(result[0].content).toEqual([
+				{ type: "text", text: "Look:" },
+				kept ? image : { type: "text", text: oversizedImagePlaceholder(length) },
+			])
+		})
+
+		it("replaces oversized images inside tool results and keeps the others", () => {
+			const small = imageBlock(16)
+			const large = imageBlock(5_280_844)
+			const messages: ApiMessage[] = [
+				{
+					role: "user",
+					content: [{ type: "tool_result", tool_use_id: "t1", content: [small, large] }],
+				},
+			]
+
+			const result = maybeRemoveImageBlocks(messages, createMockApiHandler(true))
+
+			expect(result[0].content).toEqual([
+				{
+					type: "tool_result",
+					tool_use_id: "t1",
+					content: [small, { type: "text", text: oversizedImagePlaceholder(5_280_844) }],
+				},
+			])
+			expect(oversizedImagePlaceholder(5_280_844)).toBe(
+				"[Image omitted: its encoded size of 5.0 MB exceeds the 5 MB limit per image]",
+			)
+		})
+
+		it("does not mutate the stored history", () => {
+			const large = imageBlock(MAX_IMAGE_BASE64_LENGTH + 4)
+			const messages: ApiMessage[] = [{ role: "user", content: [large] }]
+
+			maybeRemoveImageBlocks(messages, createMockApiHandler(true))
+
+			expect(messages[0].content).toEqual([large])
+		})
 	})
 })

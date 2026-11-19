@@ -1,32 +1,66 @@
+import type { Anthropic } from "@anthropic-ai/sdk"
+
+import { MAX_IMAGE_BASE64_LENGTH } from "@roo-code/types"
+
 import { ApiMessage } from "../../core/task-persistence/apiMessages"
 
 import { ApiHandler } from "../index"
 
-/* Removes image blocks from messages if they are not supported by the Api Handler */
+export const UNSUPPORTED_IMAGE_PLACEHOLDER = "[Referenced image in conversation]"
+
+export function oversizedImagePlaceholder(base64Length: number): string {
+	const sizeMB = (base64Length / (1024 * 1024)).toFixed(1)
+	const maxMB = MAX_IMAGE_BASE64_LENGTH / (1024 * 1024)
+	return `[Image omitted: its encoded size of ${sizeMB} MB exceeds the ${maxMB} MB limit per image]`
+}
+
+type ContentBlock = Exclude<ApiMessage["content"], string>[number]
+
+function replaceImage(block: Anthropic.ImageBlockParam, supportsImages: boolean): Anthropic.TextBlockParam | null {
+	if (!supportsImages) {
+		return { type: "text", text: UNSUPPORTED_IMAGE_PLACEHOLDER }
+	}
+	if (block.source.type === "base64" && block.source.data.length > MAX_IMAGE_BASE64_LENGTH) {
+		return { type: "text", text: oversizedImagePlaceholder(block.source.data.length) }
+	}
+	return null
+}
+
+function cleanBlock(block: ContentBlock, supportsImages: boolean): ContentBlock {
+	if (block.type === "image") {
+		return replaceImage(block, supportsImages) ?? block
+	}
+	if (block.type === "tool_result" && Array.isArray(block.content)) {
+		let changed = false
+		const content = block.content.map((inner) => {
+			if (inner.type !== "image") {
+				return inner
+			}
+			const replacement = replaceImage(inner, supportsImages)
+			if (!replacement) {
+				return inner
+			}
+			changed = true
+			return replacement
+		})
+		return changed ? { ...block, content } : block
+	}
+	return block
+}
+
+/**
+ * Replaces image blocks the provider would reject with text placeholders:
+ * all images if the model doesn't support them, otherwise only images over `MAX_IMAGE_BASE64_LENGTH`.
+ * The stored history keeps the original, so a task with an oversized image isn't stuck on retries.
+ */
 export function maybeRemoveImageBlocks(messages: ApiMessage[], apiHandler: ApiHandler): ApiMessage[] {
-	// Check model capability ONCE instead of for every message
-	const supportsImages = apiHandler.getModel().info.supportsImages
+	const supportsImages = apiHandler.getModel().info.supportsImages ?? false
 
 	return messages.map((message) => {
-		// Handle array content (could contain image blocks).
-		let { content } = message
-		if (Array.isArray(content)) {
-			if (!supportsImages) {
-				// Convert image blocks to text descriptions.
-				content = content.map((block) => {
-					if (block.type === "image") {
-						// Convert image blocks to text descriptions.
-						// Note: We can't access the actual image content/url due to API limitations,
-						// but we can indicate that an image was present in the conversation.
-						return {
-							type: "text",
-							text: "[Referenced image in conversation]",
-						}
-					}
-					return block
-				})
-			}
+		const { content } = message
+		if (!Array.isArray(content)) {
+			return { ...message }
 		}
-		return { ...message, content }
+		return { ...message, content: content.map((block) => cleanBlock(block, supportsImages)) }
 	})
 }
