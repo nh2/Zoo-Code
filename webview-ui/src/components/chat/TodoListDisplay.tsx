@@ -45,7 +45,8 @@ export function TodoListDisplay({ todos }: { todos: any[] }) {
 			const scrollTo = targetTop - (ulHeight / 2 - targetHeight / 2)
 			ul.scrollTop = scrollTo
 		}
-	}, [todos, isCollapsed, scrollIndex])
+		// Not keyed on `todos`: every chat message re-parses it into a new array, which would undo the user's scroll.
+	}, [isCollapsed, scrollIndex])
 	if (!Array.isArray(todos) || todos.length === 0) return null
 
 	const totalCount = todos.length
