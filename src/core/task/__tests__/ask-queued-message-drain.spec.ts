@@ -100,27 +100,33 @@ describe("Task.ask queued message drain", () => {
 		expect(task.messageQueueService.isEmpty()).toBe(true)
 	})
 
-	it("preserves approve-with-feedback behavior for ordinary tool asks", async () => {
+	it.each([
+		["command", "npm test"],
+		["use_mcp_server", "{}"],
+		["tool", JSON.stringify({ tool: "readFile" })],
+		["tool", "not-json"],
+	] as const)("rejects a %s ask with the queued message as feedback", async (type, text) => {
 		const task = await createTask()
-		task.messageQueueService.addMessage("Use this context")
+		task.messageQueueService.addMessage("Do something else instead")
 
-		const result = await task.ask("tool", JSON.stringify({ tool: "readFile" }), false)
+		const result = await task.ask(type, text, false)
 
-		expect(result).toMatchObject({ response: "yesButtonClicked", text: "Use this context" })
+		expect(result).toMatchObject({ response: "noButtonClicked", text: "Do something else instead" })
 		expect(task.messageQueueService.isEmpty()).toBe(true)
 	})
 
 	it.each([
 		["command", "npm test"],
 		["use_mcp_server", "{}"],
-		["tool", "not-json"],
-	] as const)("preserves approve-with-feedback behavior for %s asks", async (type, text) => {
+		["tool", JSON.stringify({ tool: "readFile" })],
+	] as const)("rejects a %s ask when a message is queued mid-wait", async (type, text) => {
 		const task = await createTask()
-		task.messageQueueService.addMessage("Approval context")
 
-		const result = await task.ask(type, text, false)
+		const askPromise = task.ask(type, text, false)
+		task.messageQueueService.addMessage("Stop, read this first")
+		const result = await askPromise
 
-		expect(result).toMatchObject({ response: "yesButtonClicked", text: "Approval context" })
+		expect(result).toMatchObject({ response: "noButtonClicked", text: "Stop, read this first" })
 		expect(task.messageQueueService.isEmpty()).toBe(true)
 	})
 
@@ -128,7 +134,7 @@ describe("Task.ask queued message drain", () => {
 		["use_mcp_server", "{}", true],
 		["tool", JSON.stringify({ tool: "readFile" }), true],
 		["command", "npm test", undefined],
-	] as const)("stamps isAnswered on insertion of a queue-approved %s ask", async (type, text, expected) => {
+	] as const)("stamps isAnswered on insertion of a queue-rejected %s ask", async (type, text, expected) => {
 		const task = await createTask()
 		const addToClineMessages = vi.fn<(message: ClineMessage) => Promise<void>>(async () => {})
 		Object.assign(task, { addToClineMessages })

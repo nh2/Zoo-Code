@@ -229,13 +229,15 @@ function queuedResponseForAsk(type: ClineAsk, text?: string): QueuedAskResolutio
 				return { response: "messageResponse", requiresDurableAck: true }
 			}
 		} catch {
-			// Malformed tool asks retain the existing approve-with-feedback behavior.
+			// Malformed tool asks are rejected with feedback like any other tool ask.
 		}
 
-		return { response: "yesButtonClicked", requiresDurableAck: false }
+		return { response: "noButtonClicked", requiresDurableAck: false }
 	}
+	// The user wrote a queued message without seeing this proposal, so it must
+	// never approve it; rejecting with the message as feedback delivers it now.
 	if (type === "command" || type === "use_mcp_server") {
-		return { response: "yesButtonClicked", requiresDurableAck: false }
+		return { response: "noButtonClicked", requiresDurableAck: false }
 	}
 
 	return { response: "messageResponse", requiresDurableAck: type === "completion_result" }
@@ -1317,17 +1319,17 @@ export class Task extends EventEmitter<TaskEvents> implements TaskLike {
 
 	/**
 	 * Re-read the auto-approval policy immediately before a queued message would
-	 * stand in for a command ask's approval, and consult the full command policy
-	 * under the fresh state if blanket deny now engages.
+	 * answer a command ask (a rejection carrying the message as feedback), and
+	 * consult the full command policy under the fresh state if blanket deny now
+	 * engages.
 	 *
 	 * The queued-answer shortcut skips `checkAutoApproval` and the ask's decision
 	 * otherwise rides on a single settings snapshot taken before the prompt was
 	 * shown. A blanket-deny flip landing between the snapshot and the consume is
-	 * invisible to that frozen gate, and the queued message would auto-approve an
-	 * unallowlisted command — fail-OPEN through a window as wide as the prompt
-	 * dwell. Re-reading here closes it: while blanket deny engages, the message
-	 * is never consumed as approval and the ask gets the structured denial policy
-	 * would have produced without a queued message.
+	 * invisible to that frozen gate. Re-reading here keeps the policy
+	 * authoritative: while blanket deny engages, the message is not consumed and
+	 * the ask gets the structured decision policy would have produced without a
+	 * queued message, leaving the message queued for a later turn.
 	 *
 	 * With `abortSignal`, the re-check settles on the abort itself instead of
 	 * merely losing a race against it: the fresh-state read ends in uncancellable
@@ -1370,7 +1372,7 @@ export class Task extends EventEmitter<TaskEvents> implements TaskLike {
 			return { action: "release" }
 		}
 		if (!isBlanketDenyEngaged(freshState)) {
-			// Disengaged: the queued answer is a legitimate approval, as before.
+			// Disengaged: the queued answer stands.
 			return { action: "consume" }
 		}
 		// Engaged: the full policy decides, with the fresh state. `cwd` and the
@@ -1979,10 +1981,10 @@ export class Task extends EventEmitter<TaskEvents> implements TaskLike {
 		// unaffected.
 		const blanketDenyEngaged = isBlanketDenyEngaged(state)
 		// A queued message normally answers the pending ask, which for command asks
-		// means an unconditional auto-approve. That shortcut must never bypass
-		// blanket deny: while it is engaged, a command ask keeps its policy
+		// means a rejection with the message as feedback. That shortcut must never
+		// bypass blanket deny: while it is engaged, a command ask keeps its policy
 		// decision and the queued message is left in place for a later turn
-		// instead of being consumed as approval. The shared claim gate adds the
+		// instead of being consumed. The shared claim gate adds the
 		// per-turn latch: a message a blanket denial left behind answers that
 		// denial, not this ask, and a claim would force the `ask` decision below
 		// while the policy would have auto-answered it — holding a prompt no user
@@ -2034,9 +2036,12 @@ export class Task extends EventEmitter<TaskEvents> implements TaskLike {
 		const requestsTaskAllow = taskAllowEntry !== undefined && autoApprovalContext?.requestsTaskAllow === true
 		const isAutoAnswered = approval.decision === "approve" || approval.decision === "deny"
 		const autoApprovalDecision = isAutoAnswered ? approval.decision : undefined
-		// Command asks are excluded: their queued approval still awaits a policy re-check that may release or deny it.
-		const isQueueApproved = queuedAskResolution?.response === "yesButtonClicked" && type !== "command"
-		const isAnsweredOnInsert = isAutoAnswered || isQueueApproved
+		// Command asks are excluded: their queued answer still awaits a policy re-check that may release it.
+		const isQueueAnswered =
+			(queuedAskResolution?.response === "yesButtonClicked" ||
+				queuedAskResolution?.response === "noButtonClicked") &&
+			type !== "command"
+		const isAnsweredOnInsert = isAutoAnswered || isQueueAnswered
 
 		// Re-check: an abort during the getState/checkAutoApproval awaits must not post an ask row.
 		if (this.abort) {

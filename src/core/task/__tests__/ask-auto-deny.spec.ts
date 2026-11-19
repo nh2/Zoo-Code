@@ -208,13 +208,12 @@ describe("Task.ask queue path cannot bypass blanket deny", () => {
 		}
 	})
 
-	it("denies a blanket-denied command ask even when a queued message would auto-approve it", async () => {
+	it("denies a blanket-denied command ask with structured detail even when a message is queued", async () => {
 		const task = buildTask(provider, TASK_CWD)
 		const queue = await attachQueue(task)
-		// A queued message answers command asks with an unconditional
-		// yesButtonClicked — exactly the shortcut that must never stand in for
-		// approval while blanket deny is engaged. The policy denial must win,
-		// and it must carry the same structured detail as the main path.
+		// A queued message would answer the command ask itself; while blanket
+		// deny is engaged the policy denial must win instead, and it must carry
+		// the same structured detail as the main path.
 		queue.addMessage("queued feedback arriving while blanket deny is engaged")
 
 		const result = await task.ask("command", "rm x", false)
@@ -230,8 +229,8 @@ describe("Task.ask queue path cannot bypass blanket deny", () => {
 	})
 
 	it("still lets a queued message answer a command ask when blanket deny is off", async () => {
-		// Behavior unchanged while the blanket configuration is disengaged: the
-		// queued-message auto-approval shortcut keeps working.
+		// While the blanket configuration is disengaged, the queued message
+		// answers the ask: a rejection carrying it as feedback.
 		state.alwaysDenyUnapprovedCommands = false
 
 		const task = buildTask(provider, TASK_CWD)
@@ -240,7 +239,8 @@ describe("Task.ask queue path cannot bypass blanket deny", () => {
 
 		const result = await task.ask("command", "rm x", false)
 
-		expect(result.response).toBe("yesButtonClicked")
+		expect(result.response).toBe("noButtonClicked")
+		expect(result.text).toBe("queued feedback with blanket deny off")
 		expect(result.autoDenyDetail).toBeUndefined()
 		// Non-durable resolution consumed the queued message.
 		expect(queue.messages).toHaveLength(0)
@@ -257,7 +257,7 @@ describe("Task.ask queue path cannot bypass blanket deny", () => {
 
 		const result = await task.ask("command", "rm x", false)
 
-		expect(result.response).toBe("yesButtonClicked")
+		expect(result.response).toBe("noButtonClicked")
 		expect(result.text).toBe("queued feedback with the conjunction incomplete")
 		expect(queue.messages).toHaveLength(0)
 	})
@@ -271,7 +271,7 @@ describe("Task.ask queue path cannot bypass blanket deny", () => {
 
 		const result = await task.ask("command", "rm x", false)
 
-		expect(result.response).toBe("yesButtonClicked")
+		expect(result.response).toBe("noButtonClicked")
 		expect(result.text).toBe("queued feedback with the conjunction incomplete")
 		expect(queue.messages).toHaveLength(0)
 	})
@@ -717,7 +717,7 @@ describe("Task.ask queue path cannot bypass blanket deny", () => {
 
 		const result = await task.ask("tool", JSON.stringify({ tool: "readFile", path: "a.txt" }), false)
 
-		expect(result.response).toBe("yesButtonClicked")
+		expect(result.response).toBe("noButtonClicked")
 		expect(result.text).toBe("queued feedback")
 		expect(queue.messages).toHaveLength(0)
 	})
