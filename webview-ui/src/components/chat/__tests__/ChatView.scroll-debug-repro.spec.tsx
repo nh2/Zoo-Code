@@ -367,6 +367,20 @@ const getButtonByText = (text: string): HTMLButtonElement => {
 	return button
 }
 
+const hydrateAndEscapeAfterHydration = async () => {
+	await hydrate(2)
+	await waitForCalls(2)
+	await waitForCallsSettled()
+	// Past the hydration window, whose own guard would otherwise mask re-anchoring.
+	await advanceTimers(700)
+	expect(resolveFollowOutput(false)).toBe("auto")
+
+	await act(async () => {
+		fireEvent.wheel(getScrollable(), { deltaY: -120 })
+	})
+	expect(resolveFollowOutput(false)).toBe(false)
+}
+
 describe("ChatView scroll behavior regression coverage", () => {
 	beforeEach(() => {
 		vi.useFakeTimers()
@@ -511,6 +525,46 @@ describe("ChatView scroll behavior regression coverage", () => {
 
 		expect(resolveFollowOutput(false)).toBe(false)
 		await expectChevronVisible()
+	})
+
+	it("reaching the bottom without downward user intent does not re-engage sticky follow", async () => {
+		await hydrateAndEscapeAfterHydration()
+
+		// An in-flight programmatic scroll lands at the bottom after the user escaped.
+		await act(async () => {
+			harness.emitAtBottom(true)
+		})
+
+		expect(resolveFollowOutput(true)).toBe(false)
+		await expectChevronVisible()
+	})
+
+	it.each([
+		["wheel-down", () => fireEvent.wheel(getScrollable(), { deltaY: 120 })],
+		["PageDown", () => fireEvent.keyDown(window, { key: "PageDown" })],
+		[
+			"pointer drag downward",
+			() => {
+				const scrollable = getScrollable()
+				scrollable.scrollTop = 120
+				fireEvent.pointerDown(scrollable)
+				scrollable.scrollTop = 240
+				fireEvent.scroll(scrollable)
+				fireEvent.pointerUp(window)
+			},
+		],
+	])("reaching the bottom after %s re-engages sticky follow", async (_name, scrollDown) => {
+		await hydrateAndEscapeAfterHydration()
+
+		await act(async () => {
+			scrollDown()
+		})
+		await act(async () => {
+			harness.emitAtBottom(true)
+		})
+
+		expect(resolveFollowOutput(true)).toBe("auto")
+		await expectChevronHidden()
 	})
 
 	it("keeps pending approval controls visible while browsing history", async () => {

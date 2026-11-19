@@ -9,6 +9,8 @@
  *   are ignored so follow mode does not flicker off
  * - User escape intent (wheel / keyboard / pointer-upward drag / row expansion)
  *   moves to `USER_BROWSING_HISTORY` and prevents forced re-pinning
+ * - Reaching the bottom only re-anchors after downward user intent,
+ *   so programmatic scrolls still in flight cannot undo an escape
  */
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
@@ -98,6 +100,9 @@ export function useScrollLifecycle({
 	const hydrationTimeoutRef = useRef<number | null>(null)
 	const hydrationRetryUsedRef = useRef(false)
 
+	// --- Downward user intent since the last disengage ---
+	const userScrolledDownRef = useRef(false)
+
 	// --- Pointer scroll tracking ---
 	const pointerScrollActiveRef = useRef(false)
 	const pointerScrollElementRef = useRef<HTMLElement | null>(null)
@@ -125,6 +130,7 @@ export function useScrollLifecycle({
 
 	const enterUserBrowsingHistory = useCallback(
 		(_source: ScrollFollowDisengageSource) => {
+			userScrolledDownRef.current = false
 			transitionScrollPhase("USER_BROWSING_HISTORY")
 			// Always show the scroll-to-bottom CTA when the user explicitly
 			// disengages. If they happen to still be at the physical bottom,
@@ -298,9 +304,10 @@ export function useScrollLifecycle({
 	// Virtuoso callback: followOutput
 	// -----------------------------------------------------------------------
 
+	// Reads the ref so a disengage is honoured before React re-renders.
 	const followOutputCallback = useCallback((): "auto" | false => {
-		return scrollPhase === "USER_BROWSING_HISTORY" ? false : "auto"
-	}, [scrollPhase])
+		return scrollPhaseRef.current === "USER_BROWSING_HISTORY" ? false : "auto"
+	}, [])
 
 	// -----------------------------------------------------------------------
 	// Virtuoso callback: atBottomStateChange
@@ -318,7 +325,10 @@ export function useScrollLifecycle({
 			}
 
 			if (isAtBottom) {
-				if (currentPhase === "USER_BROWSING_HISTORY" && isHydratingRef.current) {
+				if (
+					currentPhase === "USER_BROWSING_HISTORY" &&
+					(isHydratingRef.current || !userScrolledDownRef.current)
+				) {
 					setShowScrollToBottom(true)
 					return
 				}
@@ -350,8 +360,13 @@ export function useScrollLifecycle({
 	const handleWheel = useCallback(
 		(event: Event) => {
 			const wheelEvent = event as WheelEvent
-			if (wheelEvent.deltaY < 0 && scrollContainerRef.current?.contains(wheelEvent.target as Node)) {
+			if (!scrollContainerRef.current?.contains(wheelEvent.target as Node)) {
+				return
+			}
+			if (wheelEvent.deltaY < 0) {
 				enterUserBrowsingHistory("wheel-up")
+			} else if (wheelEvent.deltaY > 0) {
+				userScrolledDownRef.current = true
 			}
 		},
 		[enterUserBrowsingHistory, scrollContainerRef],
@@ -422,6 +437,8 @@ export function useScrollLifecycle({
 
 			if (previousTop !== null && currentTop < previousTop) {
 				enterUserBrowsingHistory("pointer-scroll-up")
+			} else if (previousTop !== null && currentTop > previousTop) {
+				userScrolledDownRef.current = true
 			}
 		},
 		[enterUserBrowsingHistory, scrollContainerRef],
@@ -448,7 +465,13 @@ export function useScrollLifecycle({
 				return
 			}
 
-			if (keyEvent.key !== "PageUp" && keyEvent.key !== "Home" && keyEvent.key !== "ArrowUp") {
+			const isUpKey = keyEvent.key === "PageUp" || keyEvent.key === "Home" || keyEvent.key === "ArrowUp"
+			const isDownKey =
+				keyEvent.key === "PageDown" ||
+				keyEvent.key === "End" ||
+				keyEvent.key === "ArrowDown" ||
+				keyEvent.key === " "
+			if (!isUpKey && !isDownKey) {
 				return
 			}
 
@@ -462,8 +485,14 @@ export function useScrollLifecycle({
 			const eventTargetInsideChat =
 				keyEvent.target instanceof Node && !!scrollContainerRef.current?.contains(keyEvent.target)
 
-			if (focusInsideChat || eventTargetInsideChat || activeElement === document.body) {
+			if (!focusInsideChat && !eventTargetInsideChat && activeElement !== document.body) {
+				return
+			}
+
+			if (isUpKey) {
 				enterUserBrowsingHistory("keyboard-nav-up")
+			} else {
+				userScrolledDownRef.current = true
 			}
 		},
 		[enterUserBrowsingHistory, hasTask, isHidden, scrollContainerRef],
