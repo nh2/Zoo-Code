@@ -963,9 +963,67 @@ describe("webviewMessageHandler - image mentions", () => {
 		})
 
 		expect(vi.mocked(resolveImageMentions)).toHaveBeenCalled()
-		expect(mockHandleWebviewAskResponse).toHaveBeenCalledWith("messageResponse", "See @/img.png", [
-			"data:image/png;base64,from-mention",
-		])
+		expect(mockHandleWebviewAskResponse).toHaveBeenCalledWith(
+			"messageResponse",
+			"See @/img.png",
+			["data:image/png;base64,from-mention"],
+			{ allowCommandForTask: false },
+		)
+	})
+})
+
+describe("webviewMessageHandler - task command allow list", () => {
+	const entry = { command: "./deploy.sh staging", cwd: "/mock/workspace" }
+	const handleWebviewAskResponse = vi.fn()
+	const revokeAllowedCommand = vi.fn().mockResolvedValue(undefined)
+
+	beforeEach(() => {
+		vi.clearAllMocks()
+		mockClineProvider.getState = vi.fn().mockResolvedValue({ maxImageFileSize: 5, maxTotalImageSize: 20 })
+		// The handler only reads these members of the current task.
+		const task = {
+			taskId: "task-1",
+			cwd: "/mock/workspace",
+			rooIgnoreController: undefined,
+			handleWebviewAskResponse,
+			revokeAllowedCommand,
+		}
+		vi.mocked(mockClineProvider.getCurrentTask).mockReturnValue(task as unknown as Task)
+	})
+
+	it("forwards Run + allow for task to the current task", async () => {
+		await webviewMessageHandler(mockClineProvider, {
+			type: "askResponse",
+			askResponse: "yesButtonClicked",
+			allowCommandForTask: true,
+		})
+
+		expect(handleWebviewAskResponse.mock.calls[0][0]).toBe("yesButtonClicked")
+		expect(handleWebviewAskResponse.mock.calls[0][3]).toEqual({ allowCommandForTask: true })
+	})
+
+	it.each([
+		[true, true],
+		[false, false],
+		[undefined, true],
+	])("revokes with notifyModel=%s as %s", async (notifyModel, expected) => {
+		await webviewMessageHandler(mockClineProvider, {
+			type: "revokeTaskAllowedCommand",
+			taskId: "task-1",
+			taskAllowedCommand: entry,
+			notifyModel,
+		})
+
+		expect(revokeAllowedCommand).toHaveBeenCalledWith(entry, { notifyModel: expected })
+	})
+
+	it.each([
+		["another task", { taskId: "task-2", taskAllowedCommand: entry }],
+		["a missing command", { taskId: "task-1" }],
+	])("ignores a revocation for %s", async (_label, fields) => {
+		await webviewMessageHandler(mockClineProvider, { type: "revokeTaskAllowedCommand", ...fields })
+
+		expect(revokeAllowedCommand).not.toHaveBeenCalled()
 	})
 })
 

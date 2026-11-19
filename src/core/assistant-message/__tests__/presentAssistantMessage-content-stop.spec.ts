@@ -3,6 +3,7 @@
 import { presentAssistantMessage } from "../presentAssistantMessage"
 import { DispatchState } from "../../task/dispatchState"
 import type { RequestPolicySnapshot } from "../../prompts/tools/effective-tool-policy"
+import { TaskCommandAllowlist } from "../../task/TaskCommandAllowlist"
 
 const snapshot: RequestPolicySnapshot = { disabledTools: [], customModes: [] }
 
@@ -14,7 +15,8 @@ vi.mock("../../tools/validateToolUse", () => ({
 	validateToolUse: vi.fn(),
 	isValidToolName: vi.fn(() => true),
 }))
-vi.mock("../../tools/ExecuteCommandTool", () => ({
+vi.mock("../../tools/ExecuteCommandTool", async (importOriginal) => ({
+	...(await importOriginal<typeof import("../../tools/ExecuteCommandTool")>()),
 	executeCommandTool: { handle: mockExecuteCommandHandle },
 }))
 vi.mock("../../tools/UseMcpToolTool", () => ({
@@ -57,6 +59,8 @@ function makeTask(contentStopReason: string | undefined, block: Record<string, u
 		api: { getModel: () => ({ id: "test-model", info: {} }) },
 		recordToolUsage: vi.fn(),
 		recordToolError: vi.fn(),
+		cwd: "/test/workspace",
+		commandAllowlist: new TaskCommandAllowlist(),
 		toolRepetitionDetector: { check: vi.fn().mockReturnValue({ action: "allow" }) },
 		providerRef: { deref: () => ({ getState: vi.fn().mockResolvedValue({ mode: "code", customModes: [] }) }) },
 		say: vi.fn().mockResolvedValue(undefined),

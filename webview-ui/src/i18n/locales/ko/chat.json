@@ -19,7 +19,16 @@
 		"openUiHistory": "UI 기록 열기",
 		"backToParentTask": "상위 작업",
 		"waitingOnSubtask": "하위 작업 대기 중",
-		"goToSubtask": "하위 작업으로 이동"
+		"goToSubtask": "하위 작업으로 이동",
+		"allowedCommands": {
+			"title": "허용된 명령 ({{count}})",
+			"description": "이 작업이 끝날 때까지 정확히 이 명령들은 승인 없이 실행됩니다.",
+			"inDirectory": "{{cwd}}에서",
+			"revoke": "취소",
+			"revokeTooltip": "취소하고, 이 명령에 다시 승인이 필요하다고 모델에 알립니다",
+			"moreRevokeOptions": "추가 취소 옵션",
+			"revokeSilently": "모델에 알리지 않고 취소"
+		}
 	},
 	"unpin": "고정 해제하기",
 	"pin": "고정하기",
@@ -70,6 +79,10 @@
 	"runCommand": {
 		"title": "명령",
 		"tooltip": "이 명령 실행"
+	},
+	"runCommandAllowForTask": {
+		"title": "실행 + 작업 동안 허용",
+		"tooltip": "이 명령을 실행하고, 이 작업이 끝날 때까지 정확히 같은 명령은 묻지 않고 다시 실행합니다"
 	},
 	"proceedWhileRunning": {
 		"title": "실행 중에도 계속",

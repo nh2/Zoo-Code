@@ -26,6 +26,17 @@ export const pendingTaskActionSchema = z.discriminatedUnion("kind", [
 
 export type PendingTaskAction = z.infer<typeof pendingTaskActionSchema>
 
+/**
+ * A command the user allowed to run without further approval for the rest of
+ * one task. Matched exactly: same command string, same resolved working directory.
+ */
+export const taskAllowedCommandSchema = z.object({
+	command: z.string(),
+	cwd: z.string(),
+})
+
+export type TaskAllowedCommand = z.infer<typeof taskAllowedCommandSchema>
+
 export const historyItemSchema = z.object({
 	id: z.string(),
 	rootTaskId: z.string().optional(),
@@ -50,6 +61,7 @@ export const historyItemSchema = z.object({
 	completedByChildId: z.string().optional(), // Child that completed and resumed this parent
 	completionResultSummary: z.string().optional(), // Summary from completed child
 	pendingAction: pendingTaskActionSchema.optional(),
+	taskAllowedCommands: z.array(taskAllowedCommandSchema).optional(),
 })
 
 export type HistoryItem = z.infer<typeof historyItemSchema>

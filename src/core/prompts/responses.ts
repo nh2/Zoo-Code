@@ -40,6 +40,16 @@ export const formatResponse = {
 			feedback,
 		}),
 
+	commandAllowedForTask: (command: string, cwd: string) =>
+		[
+			`The user allowed this exact command for the rest of this task: running \`${command}\` again in working directory '${cwd}' will not ask for approval.`,
+			"Any other command, including variations of this one or the same command in another working directory, still needs approval.",
+			"The user may revoke this allowance at any time; you will be told when they do.",
+		].join(" "),
+
+	commandAllowForTaskRevoked: (command: string, cwd: string) =>
+		`<task_command_allowlist_update>The user revoked the allowance to run \`${command}\` in working directory '${cwd}' without approval. Running it again will ask the user for approval.</task_command_allowlist_update>`,
+
 	toolApprovedWithFeedback: (feedback?: string) =>
 		JSON.stringify({
 			status: "approved",

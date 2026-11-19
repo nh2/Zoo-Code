@@ -19,7 +19,16 @@
 		"openUiHistory": "UI-geschiedenis openen",
 		"backToParentTask": "Bovenliggende taak",
 		"waitingOnSubtask": "Wacht op subtaak",
-		"goToSubtask": "Ga naar subtaak"
+		"goToSubtask": "Ga naar subtaak",
+		"allowedCommands": {
+			"title": "Toegestane opdrachten ({{count}})",
+			"description": "Deze exacte opdrachten worden de rest van de taak zonder goedkeuring uitgevoerd.",
+			"inDirectory": "in {{cwd}}",
+			"revoke": "Intrekken",
+			"revokeTooltip": "Intrekken en het model laten weten dat deze opdracht weer goedkeuring nodig heeft",
+			"moreRevokeOptions": "Meer opties voor intrekken",
+			"revokeSilently": "Intrekken zonder het model te informeren"
+		}
 	},
 	"unpin": "Losmaken",
 	"pin": "Vastmaken",
@@ -70,6 +79,10 @@
 	"runCommand": {
 		"title": "Commando",
 		"tooltip": "Voer dit commando uit"
+	},
+	"runCommandAllowForTask": {
+		"title": "Uitvoeren + toestaan voor taak",
+		"tooltip": "Voer deze opdracht uit en voer precies deze opdracht de rest van de taak opnieuw uit zonder te vragen"
 	},
 	"proceedWhileRunning": {
 		"title": "Doorgaan tijdens uitvoeren",

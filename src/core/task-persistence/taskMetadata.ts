@@ -1,7 +1,7 @@
 import NodeCache from "node-cache"
 import getFolderSize from "get-folder-size"
 
-import type { ClineMessage, HistoryItem } from "@roo-code/types"
+import type { ClineMessage, HistoryItem, TaskAllowedCommand } from "@roo-code/types"
 
 import { combineApiRequests } from "../../shared/combineApiRequests"
 import { combineCommandSequences } from "../../shared/combineCommandSequences"
@@ -25,6 +25,8 @@ export type TaskMetadataOptions = {
 	apiConfigName?: string
 	/** Initial status for the task (e.g., "active" for child tasks) */
 	initialStatus?: "active" | "delegated" | "completed" | "interrupted"
+	/** Commands allowed without approval for this task; omitted when the task never had any. */
+	taskAllowedCommands?: TaskAllowedCommand[]
 }
 
 export async function taskMetadata({
@@ -38,6 +40,7 @@ export async function taskMetadata({
 	mode,
 	apiConfigName,
 	initialStatus,
+	taskAllowedCommands,
 }: TaskMetadataOptions) {
 	const taskDir = await getTaskDirectoryPath(globalStoragePath, id)
 
@@ -112,6 +115,7 @@ export async function taskMetadata({
 		mode,
 		...(typeof apiConfigName === "string" && apiConfigName.length > 0 ? { apiConfigName } : {}),
 		...(initialStatus && { status: initialStatus }),
+		...(taskAllowedCommands && { taskAllowedCommands }),
 	}
 
 	return { historyItem, tokenUsage }

@@ -19,7 +19,16 @@
 		"openUiHistory": "Obrir historial d'UI",
 		"backToParentTask": "Tasca principal",
 		"waitingOnSubtask": "Esperant subtasca",
-		"goToSubtask": "Anar a la subtasca"
+		"goToSubtask": "Anar a la subtasca",
+		"allowedCommands": {
+			"title": "Ordres permeses ({{count}})",
+			"description": "Aquestes ordres exactes s'executen sense aprovació durant la resta de la tasca.",
+			"inDirectory": "a {{cwd}}",
+			"revoke": "Revoca",
+			"revokeTooltip": "Revoca i digues al model que aquesta ordre torna a necessitar aprovació",
+			"moreRevokeOptions": "Més opcions de revocació",
+			"revokeSilently": "Revoca sense avisar el model"
+		}
 	},
 	"unpin": "Desfixar",
 	"pin": "Fixar",
@@ -70,6 +79,10 @@
 	"runCommand": {
 		"title": "Ordre",
 		"tooltip": "Executa aquesta ordre"
+	},
+	"runCommandAllowForTask": {
+		"title": "Executa + permet per a la tasca",
+		"tooltip": "Executa aquesta ordre i torna a executar exactament aquesta ordre sense preguntar durant la resta de la tasca"
 	},
 	"proceedWhileRunning": {
 		"title": "Continuar mentre s'executa",

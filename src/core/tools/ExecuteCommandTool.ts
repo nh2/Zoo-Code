@@ -6,7 +6,12 @@ import * as vscode from "vscode"
 
 import delay from "delay"
 
-import { CommandExecutionStatus, DEFAULT_TERMINAL_OUTPUT_PREVIEW_SIZE, PersistedCommandOutput } from "@roo-code/types"
+import {
+	CommandExecutionStatus,
+	DEFAULT_TERMINAL_OUTPUT_PREVIEW_SIZE,
+	PersistedCommandOutput,
+	type TaskAllowedCommand,
+} from "@roo-code/types"
 import { TelemetryService } from "@roo-code/telemetry"
 
 import { buildAutoDenyReason, checkAutoApproval } from "../auto-approval"
@@ -53,6 +58,23 @@ interface ExecuteCommandParams {
 	command: string
 	cwd?: string
 	timeout?: number | null
+	allow_repeat?: boolean
+}
+
+function resolveCommandWorkingDirectory(taskCwd: string, customCwd: string | undefined): string {
+	if (!customCwd) {
+		return taskCwd
+	}
+	return path.isAbsolute(customCwd) ? customCwd : path.resolve(taskCwd, customCwd)
+}
+
+/** The task allow list key of an `execute_command` call: the command as approved, in its resolved working directory. */
+export function taskAllowEntryForCommand(taskCwd: string, command: string, customCwd?: string): TaskAllowedCommand {
+	return { command: unescapeHtmlEntities(command), cwd: resolveCommandWorkingDirectory(taskCwd, customCwd) }
+}
+
+function prependNote(note: string, result: ToolResponse): ToolResponse {
+	return typeof result === "string" ? `${note}\n\n${result}` : [{ type: "text", text: note }, ...result]
 }
 
 export function formatDcgBlockedMessage(reason?: string, ruleId?: string): string {
@@ -129,8 +151,9 @@ export class ExecuteCommandTool extends BaseTool<"execute_command"> {
 	readonly name = "execute_command" as const
 
 	async execute(params: ExecuteCommandParams, task: Task, callbacks: ToolCallbacks): Promise<void> {
-		const { command, cwd: customCwd, timeout: timeoutSeconds } = params
-		const { handleError, pushToolResult, askApproval, toolCallId } = callbacks
+		const { command, cwd: customCwd, timeout: timeoutSeconds, allow_repeat: allowRepeat } = params
+		const { handleError, askApproval, toolCallId } = callbacks
+		let pushToolResult = callbacks.pushToolResult
 
 		try {
 			if (!command) {
@@ -174,12 +197,9 @@ export class ExecuteCommandTool extends BaseTool<"execute_command"> {
 			}
 			const provider = await task.providerRef.deref()
 			let dcgDecision: DcgDecision | undefined
+			const commandCwd = resolveCommandWorkingDirectory(task.cwd, customCwd)
 			if (provider?.contextProxy.getValue("destructiveCommandGuardEnabled") === true) {
-				const workingDirectory = customCwd
-					? path.isAbsolute(customCwd)
-						? customCwd
-						: path.resolve(task.cwd, customCwd)
-					: task.cwd
+				const workingDirectory = commandCwd
 				const workingDirectoryError = await commandWorkingDirectoryError(workingDirectory)
 				if (workingDirectoryError) {
 					task.didToolFailInCurrentTurn = true
@@ -229,19 +249,34 @@ export class ExecuteCommandTool extends BaseTool<"execute_command"> {
 			// reason delivered to the model (blanket mode), or presented as Zoo's
 			// normal command prompt, with isProtected forcing the user to explicitly
 			// choose whether to execute it.
+			const taskAllowEntry = taskAllowEntryForCommand(task.cwd, command, customCwd)
+			const taskAllowContext = { commandCwd, requestsTaskAllow: allowRepeat === true }
+			const wasAllowedForTask = task.commandAllowlist.has(taskAllowEntry)
 			let didApprove: boolean
 			if (dcgDecision === undefined) {
-				didApprove = await askApproval("command", canonicalCommand)
+				didApprove = await askApproval("command", canonicalCommand, undefined, false, taskAllowContext)
 			} else if (dcgDecision.decision === "allow") {
-				didApprove = await askApproval("command", canonicalCommand, undefined, false, { dcgDecision })
+				didApprove = await askApproval("command", canonicalCommand, undefined, false, {
+					dcgDecision,
+					...taskAllowContext,
+				})
 			} else if (blanketAutoDeny) {
-				didApprove = await askApproval("command", canonicalCommand, undefined, false, { dcgDecision })
+				didApprove = await askApproval("command", canonicalCommand, undefined, false, {
+					dcgDecision,
+					...taskAllowContext,
+				})
 			} else {
-				didApprove = await askApproval("command", canonicalCommand, undefined, isProtectedAsk)
+				didApprove = await askApproval("command", canonicalCommand, undefined, isProtectedAsk, taskAllowContext)
 			}
 
 			if (!didApprove) {
 				return
+			}
+
+			if (!wasAllowedForTask && task.commandAllowlist.has(taskAllowEntry)) {
+				const note = formatResponse.commandAllowedForTask(canonicalCommand, commandCwd.toPosix())
+				const push = pushToolResult
+				pushToolResult = (result) => push(prependNote(note, result))
 			}
 
 			const executionId = task.lastMessageTs?.toString() ?? Date.now().toString()

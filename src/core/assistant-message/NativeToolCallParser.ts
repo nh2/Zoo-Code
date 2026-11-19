@@ -542,6 +542,7 @@ export class NativeToolCallParser {
 						command: partialArgs.command,
 						cwd: partialArgs.cwd,
 						timeout: partialArgs.timeout,
+						allow_repeat: this.coerceOptionalBoolean(partialArgs.allow_repeat),
 					}
 				}
 				break
@@ -888,6 +889,7 @@ export class NativeToolCallParser {
 							command: args.command,
 							cwd: args.cwd,
 							timeout: args.timeout,
+							allow_repeat: this.coerceOptionalBoolean(args.allow_repeat),
 						} as NativeArgsFor<TName>
 					}
 					break

@@ -19,7 +19,16 @@
 		"openUiHistory": "Mở lịch sử UI",
 		"backToParentTask": "Nhiệm vụ cha",
 		"waitingOnSubtask": "Đang chờ nhiệm vụ con",
-		"goToSubtask": "Đến nhiệm vụ con"
+		"goToSubtask": "Đến nhiệm vụ con",
+		"allowedCommands": {
+			"title": "Lệnh được cho phép ({{count}})",
+			"description": "Đúng những lệnh này sẽ chạy mà không cần phê duyệt trong phần còn lại của tác vụ.",
+			"inDirectory": "trong {{cwd}}",
+			"revoke": "Thu hồi",
+			"revokeTooltip": "Thu hồi và báo cho mô hình rằng lệnh này lại cần phê duyệt",
+			"moreRevokeOptions": "Thêm tùy chọn thu hồi",
+			"revokeSilently": "Thu hồi mà không báo cho mô hình"
+		}
 	},
 	"unpin": "Bỏ ghim khỏi đầu",
 	"pin": "Ghim lên đầu",
@@ -70,6 +79,10 @@
 	"runCommand": {
 		"title": "Lệnh",
 		"tooltip": "Thực thi lệnh này"
+	},
+	"runCommandAllowForTask": {
+		"title": "Chạy + cho phép trong tác vụ",
+		"tooltip": "Chạy lệnh này, và chạy lại đúng lệnh này mà không hỏi trong suốt phần còn lại của tác vụ"
 	},
 	"proceedWhileRunning": {
 		"title": "Tiếp tục trong khi chạy",

@@ -19,7 +19,16 @@
 		"openUiHistory": "UI इतिहास खोलें",
 		"backToParentTask": "मूल कार्य",
 		"waitingOnSubtask": "उपकार्य की प्रतीक्षा",
-		"goToSubtask": "उपकार्य पर जाएं"
+		"goToSubtask": "उपकार्य पर जाएं",
+		"allowedCommands": {
+			"title": "अनुमत कमांड ({{count}})",
+			"description": "ये सटीक कमांड बाकी टास्क के दौरान बिना अनुमोदन के चलते हैं।",
+			"inDirectory": "{{cwd}} में",
+			"revoke": "रद्द करें",
+			"revokeTooltip": "रद्द करें, और मॉडल को बताएँ कि इस कमांड को फिर से अनुमोदन चाहिए",
+			"moreRevokeOptions": "रद्द करने के और विकल्प",
+			"revokeSilently": "मॉडल को बताए बिना रद्द करें"
+		}
 	},
 	"unpin": "पिन करें",
 	"pin": "अवपिन करें",
@@ -70,6 +79,10 @@
 	"runCommand": {
 		"title": "कमांड",
 		"tooltip": "इस कमांड को निष्पादित करें"
+	},
+	"runCommandAllowForTask": {
+		"title": "चलाएँ + टास्क के लिए अनुमति दें",
+		"tooltip": "इस कमांड को चलाएँ, और बाकी टास्क के दौरान बिना पूछे ठीक यही कमांड फिर से चलाएँ"
 	},
 	"proceedWhileRunning": {
 		"title": "चलते समय आगे बढ़ें",

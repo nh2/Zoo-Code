@@ -40,6 +40,31 @@ describe("NativeToolCallParser", () => {
 			})
 		})
 
+		describe("execute_command allow_repeat", () => {
+			it.each([
+				[true, true],
+				[false, false],
+				["true", true],
+				[null, undefined],
+			])("parses allow_repeat %j as %j", (raw, expected) => {
+				const result = NativeToolCallParser.parseToolCall({
+					id: "toolu_allow_repeat",
+					name: "execute_command",
+					arguments: JSON.stringify({
+						command: "systemctl status nginx",
+						cwd: null,
+						timeout: null,
+						allow_repeat: raw,
+					}),
+				})
+
+				expect(result?.type === "tool_use" ? result.nativeArgs : undefined).toMatchObject({
+					command: "systemctl status nginx",
+					allow_repeat: expected,
+				})
+			})
+		})
+
 		describe("read_file tool", () => {
 			it("should parse minimal single-file read_file args", () => {
 				const toolCall = {

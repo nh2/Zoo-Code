@@ -736,9 +736,20 @@ export const webviewMessageHandler = async (
 				const resolved = await resolveIncomingImages({ text: message.text, images: message.images })
 				provider
 					.getCurrentTask()
-					?.handleWebviewAskResponse(message.askResponse!, resolved.text, resolved.images)
+					?.handleWebviewAskResponse(message.askResponse!, resolved.text, resolved.images, {
+						allowCommandForTask: message.allowCommandForTask === true,
+					})
 			}
 			break
+
+		case "revokeTaskAllowedCommand": {
+			const entry = message.taskAllowedCommand
+			const task = provider.getCurrentTask()
+			if (entry && task && (!message.taskId || message.taskId === task.taskId)) {
+				await task.revokeAllowedCommand(entry, { notifyModel: message.notifyModel !== false })
+			}
+			break
+		}
 
 		case "updateSettings":
 			if (message.updatedSettings) {

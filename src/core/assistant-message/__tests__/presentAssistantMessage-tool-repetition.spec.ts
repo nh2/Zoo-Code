@@ -5,6 +5,7 @@ import { providerIdentifiers } from "@roo-code/types"
 
 import type { ToolUse } from "../../../shared/tools"
 import { ToolRepetitionDetector } from "../../tools/ToolRepetitionDetector"
+import { TaskCommandAllowlist } from "../../task/TaskCommandAllowlist"
 import type { RequestPolicySnapshot } from "../../prompts/tools/effective-tool-policy"
 import { presentAssistantMessage } from "../presentAssistantMessage"
 
@@ -57,13 +58,22 @@ vi.mock("../../../i18n", () => ({
 // successful tool run by pushing a tool_result, mirroring the real tool.
 // `vi.hoisted` is required because `vi.mock` factories are hoisted above
 // top-level variable declarations.
-const { readFileHandle, attemptCompletionHandle } = vi.hoisted(() => ({
+const { readFileHandle, attemptCompletionHandle, executeCommandHandle } = vi.hoisted(() => ({
 	readFileHandle: vi.fn(
 		async (_cline: unknown, block: ToolBlock, { pushToolResult }: { pushToolResult: (result: string) => void }) => {
 			pushToolResult(`[read_file for '${block?.params?.path ?? block?.nativeArgs?.path}'] Result`)
 		},
 	),
 	attemptCompletionHandle: vi.fn(async () => {}),
+	executeCommandHandle: vi.fn(
+		async (
+			_cline: unknown,
+			_block: ToolBlock,
+			{ pushToolResult }: { pushToolResult: (result: string) => void },
+		) => {
+			pushToolResult("Command executed")
+		},
+	),
 }))
 
 vi.mock("../../tools/ReadFileTool", () => ({
@@ -71,6 +81,13 @@ vi.mock("../../tools/ReadFileTool", () => ({
 		handle: readFileHandle,
 		getReadFileToolDescription: vi.fn(() => "[read_file]"),
 	},
+}))
+
+// Only the tool run is mocked: the allow list key helper stays real, so the
+// exemption is checked against the same key the approval prompt uses.
+vi.mock("../../tools/ExecuteCommandTool", async (importOriginal) => ({
+	...(await importOriginal<typeof import("../../tools/ExecuteCommandTool")>()),
+	executeCommandTool: { handle: executeCommandHandle },
 }))
 
 // Mock attempt_completion so we can show the repetition check runs before
@@ -116,6 +133,20 @@ function makeReadFileBlock(id: string, path = "test.txt"): ToolUse<"read_file"> 
 		name: "read_file",
 		params: { path },
 		nativeArgs: { path },
+		partial: false,
+	}
+}
+
+const TASK_CWD = "/srv/app"
+const STATUS_COMMAND = "systemctl status nginx"
+
+function makeExecuteCommandBlock(id: string, cwd?: string): ToolUse<"execute_command"> {
+	return {
+		type: "tool_use",
+		id,
+		name: "execute_command",
+		params: { command: STATUS_COMMAND, ...(cwd !== undefined && { cwd }) },
+		nativeArgs: { command: STATUS_COMMAND, ...(cwd !== undefined && { cwd }) },
 		partial: false,
 	}
 }
@@ -174,6 +205,8 @@ describe("presentAssistantMessage - Tool Repetition Detection", () => {
 			recordToolUsage: vi.fn(),
 			recordToolError: vi.fn(),
 			toolRepetitionDetector: detector,
+			cwd: TASK_CWD,
+			commandAllowlist: new TaskCommandAllowlist(),
 			providerRef: {
 				deref: () => ({
 					getState: vi.fn().mockResolvedValue({
@@ -445,5 +478,67 @@ describe("presentAssistantMessage - Tool Repetition Detection", () => {
 		)
 		expect(feedbackBlock).toBeDefined()
 		expect(feedbackBlock?.text).toContain("Tool repetition limit reached")
+	})
+
+	describe("commands on the task allow list", () => {
+		const allowlist = () => mockTask.commandAllowlist as TaskCommandAllowlist
+
+		/** Presents the same command once per turn, `times` turns in a row. */
+		async function presentRepeatedly(times: number, cwd?: string) {
+			for (let i = 0; i < times; i++) {
+				startNextTurn([makeExecuteCommandBlock(`exec_${i}`, cwd)])
+				await present()
+			}
+		}
+
+		it.each([
+			["in the task workspace", { command: STATUS_COMMAND, cwd: TASK_CWD }, undefined],
+			["in a relative working directory", { command: STATUS_COMMAND, cwd: `${TASK_CWD}/sub` }, "sub"],
+		])("never blocks an allowed command repeated %s", async (_label, entry, cwd) => {
+			allowlist().add(entry)
+
+			await presentRepeatedly(HARD_LIMIT + 3, cwd)
+
+			expect(executeCommandHandle).toHaveBeenCalledTimes(HARD_LIMIT + 3)
+			expect(mockTask.ask).not.toHaveBeenCalled()
+		})
+
+		it.each([
+			["is not allowed", undefined],
+			["is allowed in another working directory only", { command: STATUS_COMMAND, cwd: "/srv/other" }],
+		])("still blocks a repeated command that %s", async (_label, entry) => {
+			if (entry) {
+				allowlist().add(entry)
+			}
+
+			await presentRepeatedly(SOFT_LIMIT + 1)
+
+			expect(executeCommandHandle).toHaveBeenCalledTimes(SOFT_LIMIT)
+			const { error } = JSON.parse(String(findToolResult(`exec_${SOFT_LIMIT}`)?.content)) as { error: string }
+			expect(error).toBe(`tools:toolRepetitionSoftBlock ${JSON.stringify({ toolName: "execute_command" })}`)
+		})
+
+		it("blocks the command again once its allowance is revoked", async () => {
+			allowlist().add({ command: STATUS_COMMAND, cwd: TASK_CWD })
+			await presentRepeatedly(HARD_LIMIT)
+
+			allowlist().remove({ command: STATUS_COMMAND, cwd: TASK_CWD })
+			await presentRepeatedly(SOFT_LIMIT + 1)
+
+			expect(executeCommandHandle).toHaveBeenCalledTimes(HARD_LIMIT + SOFT_LIMIT)
+		})
+
+		it("ends the streak of another repeated call", async () => {
+			allowlist().add({ command: STATUS_COMMAND, cwd: TASK_CWD })
+			// The next identical read_file would be soft blocked without the command in between.
+			primeDetector(detector, makeReadFileBlock("earlier"), SOFT_LIMIT)
+
+			await presentRepeatedly(1)
+			startNextTurn([makeReadFileBlock("after_command")])
+			await present()
+
+			expect(readFileHandle).toHaveBeenCalledTimes(1)
+			expect(findToolResult("after_command")?.content).toContain("read_file")
+		})
 	})
 })

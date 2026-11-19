@@ -128,8 +128,11 @@ export class ToolRepetitionDetector {
 
 	/**
 	 * Resets the internal repetition tracking state.
+	 *
+	 * Callers use this for a tool call that is exempt from checking, so that it
+	 * still ends a streak of other identical calls, as any other call would.
 	 */
-	private reset(): void {
+	public reset(): void {
 		this.consecutiveIdenticalToolCallCount = 0
 		this.previousToolCallJson = null
 	}

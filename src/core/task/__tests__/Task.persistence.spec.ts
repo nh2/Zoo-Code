@@ -1348,6 +1348,32 @@ describe("Task persistence", () => {
 		})
 	})
 
+	describe("task command allow list", () => {
+		it.each([
+			["restores the allowed commands", [{ command: "./deploy.sh staging", cwd: "/srv/app" }]],
+			["starts empty for a task without any", undefined],
+		])("%s from the history item", (_label, taskAllowedCommands) => {
+			const task = new Task({
+				provider: mockProvider,
+				apiConfiguration: mockApiConfig,
+				historyItem: {
+					id: "task-allowlist",
+					number: 1,
+					ts: 1,
+					task: "Deploy",
+					tokensIn: 0,
+					tokensOut: 0,
+					totalCost: 0,
+					taskAllowedCommands,
+				},
+				startTask: false,
+			})
+
+			expect(task.commandAllowlist.list()).toEqual(taskAllowedCommands ?? [])
+			expect(task.commandAllowlist.toPersisted()).toEqual(taskAllowedCommands)
+		})
+	})
+
 	describe("pending action resume", () => {
 		const pendingAction: PendingTaskAction = {
 			kind: "finish_subtask",
@@ -2220,7 +2246,11 @@ describe("Task persistence", () => {
 
 	describe("resumeTaskFromHistory", () => {
 		it.each([
-			{ response: "yesButtonClicked" as const, text: "Also fix the tests", images: ["data:image/png;base64,AAA"] },
+			{
+				response: "yesButtonClicked" as const,
+				text: "Also fix the tests",
+				images: ["data:image/png;base64,AAA"],
+			},
 			{ response: "messageResponse" as const, text: "Also fix the tests", images: ["data:image/png;base64,AAA"] },
 		])("forwards chat box input sent with $response to the resumed task", async ({ response, text, images }) => {
 			mockReadApiMessages.mockResolvedValue([{ role: "assistant", content: [{ type: "text", text: "Working" }] }])

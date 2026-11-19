@@ -4,7 +4,7 @@ import { providerIdentifiers } from "@roo-code/types"
 import React from "react"
 import { renderWithExtensionState, screen, fireEvent } from "@/utils/test-utils"
 
-import type { ProviderSettings } from "@roo-code/types"
+import type { ProviderSettings, TaskAllowedCommand } from "@roo-code/types"
 
 import TaskHeader, { TaskHeaderProps } from "../TaskHeader"
 
@@ -38,7 +38,13 @@ vi.mock("@vscode/webview-ui-toolkit/react", () => ({
 // Create a variable to hold the mock state
 const mockExtensionState: {
 	apiConfiguration: ProviderSettings
-	currentTaskItem: { id: string; task?: string; title?: string } | null
+	currentTaskItem: {
+		id: string
+		task?: string
+		title?: string
+		workspace?: string
+		taskAllowedCommands?: TaskAllowedCommand[]
+	} | null
 	clineMessages: any[]
 	taskHistory: any[]
 	showCacheCountdown?: boolean
@@ -401,6 +407,43 @@ describe("TaskHeader", () => {
 			renderTaskHeader({ contextTokens: 250 })
 
 			expect(screen.getByText("25%")).toBeInTheDocument()
+		})
+	})
+	describe("Allowed commands section", () => {
+		afterEach(() => {
+			mockExtensionState.currentTaskItem = { id: "test-task-id" }
+		})
+
+		it.each([
+			["shows", [{ command: "./deploy.sh staging", cwd: "/srv/app" }], true],
+			["hides", [], false],
+			["hides", undefined, false],
+		])("%s the section in the expanded header for %j", (_label, taskAllowedCommands, visible) => {
+			mockExtensionState.currentTaskItem = {
+				id: "test-task-id",
+				task: "Test task",
+				workspace: "/srv/app",
+				taskAllowedCommands,
+			}
+			renderTaskHeader()
+			fireEvent.click(screen.getByText("Test task"))
+
+			expect(screen.queryByTestId("task-allowed-commands") !== null).toBe(visible)
+		})
+
+		it("expands without collapsing the header", () => {
+			mockExtensionState.currentTaskItem = {
+				id: "test-task-id",
+				task: "Test task",
+				taskAllowedCommands: [{ command: "./deploy.sh staging", cwd: "/srv/app" }],
+			}
+			renderTaskHeader()
+			fireEvent.click(screen.getByText("Test task"))
+
+			fireEvent.click(screen.getByText("chat:task.allowedCommands.title"))
+
+			expect(screen.getByText("./deploy.sh staging")).toBeInTheDocument()
+			expect(screen.getByText("chat:task.title")).toBeInTheDocument()
 		})
 	})
 })

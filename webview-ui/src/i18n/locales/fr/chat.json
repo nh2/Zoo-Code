@@ -19,7 +19,16 @@
 		"openUiHistory": "Ouvrir l'historique de l'UI",
 		"backToParentTask": "Tâche parente",
 		"waitingOnSubtask": "En attente de sous-tâche",
-		"goToSubtask": "Aller à la sous-tâche"
+		"goToSubtask": "Aller à la sous-tâche",
+		"allowedCommands": {
+			"title": "Commandes autorisées ({{count}})",
+			"description": "Ces commandes exactes s'exécutent sans approbation pour le reste de la tâche.",
+			"inDirectory": "dans {{cwd}}",
+			"revoke": "Révoquer",
+			"revokeTooltip": "Révoquer et indiquer au modèle que cette commande nécessite à nouveau une approbation",
+			"moreRevokeOptions": "Plus d'options de révocation",
+			"revokeSilently": "Révoquer sans prévenir le modèle"
+		}
 	},
 	"unpin": "Désépingler",
 	"pin": "Épingler",
@@ -70,6 +79,10 @@
 	"runCommand": {
 		"title": "Commande",
 		"tooltip": "Exécuter cette commande"
+	},
+	"runCommandAllowForTask": {
+		"title": "Exécuter + autoriser pour la tâche",
+		"tooltip": "Exécute cette commande, puis relance exactement cette commande sans demander pour le reste de la tâche"
 	},
 	"proceedWhileRunning": {
 		"title": "Continuer pendant l'exécution",

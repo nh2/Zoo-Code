@@ -19,7 +19,16 @@
 		"openUiHistory": "Otwórz historię UI",
 		"backToParentTask": "Zadanie nadrzędne",
 		"waitingOnSubtask": "Oczekuje na podzadanie",
-		"goToSubtask": "Przejdź do podzadania"
+		"goToSubtask": "Przejdź do podzadania",
+		"allowedCommands": {
+			"title": "Dozwolone polecenia ({{count}})",
+			"description": "Te dokładne polecenia są uruchamiane bez zatwierdzenia do końca zadania.",
+			"inDirectory": "w {{cwd}}",
+			"revoke": "Cofnij",
+			"revokeTooltip": "Cofnij i powiadom model, że to polecenie znów wymaga zatwierdzenia",
+			"moreRevokeOptions": "Więcej opcji cofania",
+			"revokeSilently": "Cofnij bez powiadamiania modelu"
+		}
 	},
 	"unpin": "Odepnij",
 	"pin": "Przypnij",
@@ -70,6 +79,10 @@
 	"runCommand": {
 		"title": "Polecenie",
 		"tooltip": "Wykonaj to polecenie"
+	},
+	"runCommandAllowForTask": {
+		"title": "Uruchom + zezwól w zadaniu",
+		"tooltip": "Uruchom to polecenie i uruchamiaj dokładnie to polecenie ponownie bez pytania do końca zadania"
 	},
 	"proceedWhileRunning": {
 		"title": "Kontynuuj podczas wykonywania",

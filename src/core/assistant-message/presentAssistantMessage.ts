@@ -27,7 +27,7 @@ import { searchReplaceTool } from "../tools/SearchReplaceTool"
 import { editFileTool } from "../tools/EditFileTool"
 import { applyPatchTool } from "../tools/ApplyPatchTool"
 import { searchFilesTool } from "../tools/SearchFilesTool"
-import { executeCommandTool } from "../tools/ExecuteCommandTool"
+import { executeCommandTool, taskAllowEntryForCommand } from "../tools/ExecuteCommandTool"
 import { useMcpToolTool } from "../tools/UseMcpToolTool"
 import { accessMcpResourceTool } from "../tools/accessMcpResourceTool"
 import { askFollowupQuestionTool } from "../tools/AskFollowupQuestionTool"
@@ -867,7 +867,10 @@ async function presentAssistantMessageBlock(cline: Task, policySnapshot: Request
 			}
 
 			// Check for identical consecutive tool calls.
-			if (!block.partial) {
+			if (!block.partial && isTaskAllowedCommandCall(cline, block)) {
+				// The user explicitly allowed repeating this exact command, and can revoke that.
+				cline.toolRepetitionDetector.reset()
+			} else if (!block.partial) {
 				// Use the detector to check for repetition, passing the ToolUse
 				// block directly.
 				const repetitionCheck = cline.toolRepetitionDetector.check(block)
@@ -1257,4 +1260,12 @@ async function checkpointSaveAndMark(task: Task) {
 	} catch (error) {
 		console.error(`[Task#presentAssistantMessage] Error saving checkpoint: ${error.message}`, error)
 	}
+}
+
+function isTaskAllowedCommandCall(task: Task, block: ToolUse): boolean {
+	if (block.name !== "execute_command") {
+		return false
+	}
+	const args = (block as ToolUse<"execute_command">).nativeArgs
+	return !!args?.command && task.commandAllowlist.has(taskAllowEntryForCommand(task.cwd, args.command, args.cwd))
 }

@@ -19,7 +19,16 @@
 		"openUiHistory": "UI履歴を開く",
 		"backToParentTask": "親タスク",
 		"waitingOnSubtask": "サブタスク待ち",
-		"goToSubtask": "サブタスクへ"
+		"goToSubtask": "サブタスクへ",
+		"allowedCommands": {
+			"title": "許可されたコマンド ({{count}})",
+			"description": "これらのコマンドは、このタスクの間は承認なしで実行されます（完全一致のみ）。",
+			"inDirectory": "{{cwd}} で",
+			"revoke": "取り消す",
+			"revokeTooltip": "取り消して、このコマンドには再び承認が必要であることをモデルに伝えます",
+			"moreRevokeOptions": "その他の取り消しオプション",
+			"revokeSilently": "モデルに伝えずに取り消す"
+		}
 	},
 	"unpin": "ピン留めを解除",
 	"pin": "ピン留め",
@@ -70,6 +79,10 @@
 	"runCommand": {
 		"title": "コマンド",
 		"tooltip": "このコマンドを実行"
+	},
+	"runCommandAllowForTask": {
+		"title": "実行 + タスク中は許可",
+		"tooltip": "このコマンドを実行し、このタスクの間はまったく同じコマンドを確認なしで再実行します"
 	},
 	"proceedWhileRunning": {
 		"title": "実行中も続行",

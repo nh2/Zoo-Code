@@ -19,6 +19,13 @@ export type AutoApprovalContext = {
 	 * produce a verdict — they surface as a retryable tool error beforehand.
 	 */
 	dcgDecision?: DcgDecision
+	/**
+	 * Resolved working directory of the command (`execute_command` only).
+	 * Together with the command text it is the key of the task's command allow list.
+	 */
+	commandCwd?: string
+	/** The model asked to run this command repeatedly (`execute_command` only). */
+	requestsTaskAllow?: boolean
 }
 
 export type AskApproval = (
@@ -86,6 +93,7 @@ export const toolParamNames = [
 	"replace_all", // edit tool parameter for replacing all occurrences
 	"expected_replacements", // edit_file parameter for multiple occurrences
 	"timeout", // execute_command parameter
+	"allow_repeat", // execute_command parameter
 	"artifact_id", // read_command_output parameter
 	"search", // read_command_output parameter for grep-like search
 	"offset", // read_command_output and read_file parameter
@@ -113,7 +121,7 @@ export type NativeToolArgs = {
 	read_file: import("@roo-code/types").ReadFileToolParams
 	read_command_output: { artifact_id: string; search?: string; offset?: number; limit?: number }
 	attempt_completion: { result: string }
-	execute_command: { command: string; cwd?: string; timeout?: number | null }
+	execute_command: { command: string; cwd?: string; timeout?: number | null; allow_repeat?: boolean }
 	apply_diff: { path: string; diff: string }
 	edit: { file_path: string; old_string: string; new_string: string; replace_all?: boolean }
 	search_and_replace: { file_path: string; old_string: string; new_string: string; replace_all?: boolean }

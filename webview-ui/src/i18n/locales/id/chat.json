@@ -19,7 +19,16 @@
 		"openUiHistory": "Buka Riwayat UI",
 		"backToParentTask": "Tugas Induk",
 		"waitingOnSubtask": "Menunggu subtugas",
-		"goToSubtask": "Pergi ke subtugas"
+		"goToSubtask": "Pergi ke subtugas",
+		"allowedCommands": {
+			"title": "Perintah yang diizinkan ({{count}})",
+			"description": "Perintah persis ini berjalan tanpa persetujuan selama sisa tugas ini.",
+			"inDirectory": "di {{cwd}}",
+			"revoke": "Cabut",
+			"revokeTooltip": "Cabut, dan beri tahu model bahwa perintah ini perlu persetujuan lagi",
+			"moreRevokeOptions": "Opsi pencabutan lainnya",
+			"revokeSilently": "Cabut tanpa memberi tahu model"
+		}
 	},
 	"history": {
 		"title": "Riwayat"
@@ -100,6 +109,10 @@
 	"runCommand": {
 		"title": "Perintah",
 		"tooltip": "Jalankan perintah ini"
+	},
+	"runCommandAllowForTask": {
+		"title": "Jalankan + izinkan untuk tugas",
+		"tooltip": "Jalankan perintah ini, dan jalankan lagi perintah yang persis sama tanpa bertanya selama sisa tugas ini"
 	},
 	"proceedWhileRunning": {
 		"title": "Lanjutkan Saat Berjalan",

@@ -19,7 +19,16 @@
 		"openUiHistory": "打开 UI 历史",
 		"backToParentTask": "父任务",
 		"waitingOnSubtask": "等待子任务",
-		"goToSubtask": "前往子任务"
+		"goToSubtask": "前往子任务",
+		"allowedCommands": {
+			"title": "已允许的命令 ({{count}})",
+			"description": "在本任务剩余时间内，这些完全相同的命令无需批准即可运行。",
+			"inDirectory": "位于 {{cwd}}",
+			"revoke": "撤销",
+			"revokeTooltip": "撤销，并告知模型此命令需要重新批准",
+			"moreRevokeOptions": "更多撤销选项",
+			"revokeSilently": "撤销但不告知模型"
+		}
 	},
 	"unpin": "取消置顶",
 	"pin": "置顶",
@@ -70,6 +79,10 @@
 	"runCommand": {
 		"title": "命令",
 		"tooltip": "执行此命令"
+	},
+	"runCommandAllowForTask": {
+		"title": "运行 + 本任务内允许",
+		"tooltip": "执行此命令，并在本任务剩余时间内无需询问即可再次运行完全相同的命令"
 	},
 	"proceedWhileRunning": {
 		"title": "强制继续",

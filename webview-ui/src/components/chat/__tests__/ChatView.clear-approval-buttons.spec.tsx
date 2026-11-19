@@ -5,7 +5,7 @@ import { renderWithExtensionState, waitFor, act, fireEvent } from "@/utils/test-
 
 import { vscode } from "@src/utils/vscode"
 
-import ChatView, { ChatViewProps } from "../ChatView"
+import ChatView, { ChatViewProps, ChatViewRef } from "../ChatView"
 
 interface ClineMessage {
 	type: "say" | "ask"
@@ -15,6 +15,8 @@ interface ClineMessage {
 	text?: string
 	partial?: boolean
 	isAnswered?: boolean
+	isProtected?: boolean
+	requestsTaskAllow?: boolean
 	checkpoint?: Record<string, unknown>
 }
 
@@ -106,6 +108,7 @@ vi.mock("react-i18next", () => ({
 }))
 
 const RUN_BUTTON_LABEL = "chat:runCommand.title"
+const RUN_ALLOW_FOR_TASK_BUTTON_LABEL = "chat:runCommandAllowForTask.title"
 const APPROVE_BUTTON_LABEL = "chat:approve.title"
 const DENY_BUTTON_LABEL = "chat:reject.title"
 const START_NEW_TASK_BUTTON_LABEL = "chat:startNewTask.title"
@@ -308,5 +311,91 @@ describe("ChatView approval button behavior", () => {
 
 		fireEvent.click(getByText(START_NEW_TASK_BUTTON_LABEL))
 		expect(vscode.postMessage).toHaveBeenCalledWith({ type: "clearTask" })
+	})
+})
+
+describe("ChatView Run + allow for task", () => {
+	beforeEach(() => vi.clearAllMocks())
+
+	const commandAskWith = (fields: Partial<ClineMessage>): ClineMessage[] => [
+		{ type: "say", say: "task", ts: 1, text: "Initial task" },
+		{ type: "ask", ask: "command", ts: 2, text: "./deploy.sh staging", partial: false, ...fields },
+	]
+
+	const buttonByLabel = (queryByText: (text: string) => HTMLElement | null, label: string) =>
+		queryByText(label)?.closest("button") ?? null
+
+	async function renderCommandAsk(fields: Partial<ClineMessage> = {}) {
+		const ref = React.createRef<ChatViewRef>()
+		const view = renderWithExtensionState(<ChatView {...defaultProps} ref={ref} />)
+		await act(async () => {
+			hydrateState(commandAskWith(fields))
+		})
+		await waitFor(() => expect(view.queryByText(RUN_BUTTON_LABEL)).toBeInTheDocument())
+		return { ...view, ref }
+	}
+
+	it("offers the button between Run and Deny", async () => {
+		const { getAllByRole } = await renderCommandAsk()
+
+		const labels = getAllByRole("button").map((button) => button.textContent)
+		const runIndex = labels.indexOf(RUN_BUTTON_LABEL)
+		expect(labels.slice(runIndex, runIndex + 3)).toEqual([
+			RUN_BUTTON_LABEL,
+			RUN_ALLOW_FOR_TASK_BUTTON_LABEL,
+			DENY_BUTTON_LABEL,
+		])
+	})
+
+	it("is not offered for a protected command", async () => {
+		const { queryByText } = await renderCommandAsk({ isProtected: true })
+
+		expect(queryByText(RUN_ALLOW_FOR_TASK_BUTTON_LABEL)).not.toBeInTheDocument()
+	})
+
+	it("sends an approval that allows the command for the task", async () => {
+		const { getByText, queryByText } = await renderCommandAsk()
+
+		fireEvent.click(getByText(RUN_ALLOW_FOR_TASK_BUTTON_LABEL))
+
+		expect(vscode.postMessage).toHaveBeenCalledWith({
+			type: "askResponse",
+			askResponse: "yesButtonClicked",
+			allowCommandForTask: true,
+		})
+		await waitFor(() => expect(queryByText(RUN_ALLOW_FOR_TASK_BUTTON_LABEL)).not.toBeInTheDocument())
+	})
+
+	it("sends a plain approval from Run", async () => {
+		const { getByText } = await renderCommandAsk()
+
+		fireEvent.click(getByText(RUN_BUTTON_LABEL))
+
+		expect(vscode.postMessage).toHaveBeenCalledWith({ type: "askResponse", askResponse: "yesButtonClicked" })
+	})
+
+	it.each([
+		["the model asked to repeat the command", true, RUN_ALLOW_FOR_TASK_BUTTON_LABEL, RUN_BUTTON_LABEL],
+		["the model did not ask to repeat it", undefined, RUN_BUTTON_LABEL, RUN_ALLOW_FOR_TASK_BUTTON_LABEL],
+	])("highlights the default action when %s", async (_label, requestsTaskAllow, primary, secondary) => {
+		const { queryByText } = await renderCommandAsk({ requestsTaskAllow })
+
+		expect(buttonByLabel(queryByText, primary)).toHaveClass("bg-primary")
+		expect(buttonByLabel(queryByText, secondary)).toHaveClass("bg-secondary")
+	})
+
+	it.each([
+		["Run + allow for task when the model asked to repeat", true, { allowCommandForTask: true }],
+		["Run otherwise", undefined, {}],
+	])("Enter triggers %s", async (_label, requestsTaskAllow, extra) => {
+		const { ref } = await renderCommandAsk({ requestsTaskAllow })
+
+		act(() => ref.current?.acceptInput())
+
+		expect(vscode.postMessage).toHaveBeenCalledWith({
+			type: "askResponse",
+			askResponse: "yesButtonClicked",
+			...extra,
+		})
 	})
 })

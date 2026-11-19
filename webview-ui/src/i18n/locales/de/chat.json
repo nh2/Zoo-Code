@@ -19,7 +19,16 @@
 		"openUiHistory": "UI-Verlauf öffnen",
 		"backToParentTask": "Übergeordnete Aufgabe",
 		"waitingOnSubtask": "Wartet auf Unteraufgabe",
-		"goToSubtask": "Zur Unteraufgabe"
+		"goToSubtask": "Zur Unteraufgabe",
+		"allowedCommands": {
+			"title": "Erlaubte Befehle ({{count}})",
+			"description": "Diese exakten Befehle laufen für den Rest der Aufgabe ohne Genehmigung.",
+			"inDirectory": "in {{cwd}}",
+			"revoke": "Widerrufen",
+			"revokeTooltip": "Widerrufen und dem Modell mitteilen, dass dieser Befehl wieder eine Genehmigung braucht",
+			"moreRevokeOptions": "Weitere Widerrufsoptionen",
+			"revokeSilently": "Widerrufen, ohne das Modell zu informieren"
+		}
 	},
 	"unpin": "Lösen von oben",
 	"pin": "Anheften",
@@ -70,6 +79,10 @@
 	"runCommand": {
 		"title": "Befehl",
 		"tooltip": "Diesen Befehl ausführen"
+	},
+	"runCommandAllowForTask": {
+		"title": "Ausführen + für Aufgabe erlauben",
+		"tooltip": "Führe diesen Befehl aus und führe genau diesen Befehl für den Rest der Aufgabe ohne Nachfrage erneut aus"
 	},
 	"proceedWhileRunning": {
 		"title": "Während Ausführung fortfahren",

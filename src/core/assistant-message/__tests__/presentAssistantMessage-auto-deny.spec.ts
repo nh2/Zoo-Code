@@ -8,6 +8,7 @@ import { validateToolUse } from "../../tools/validateToolUse"
 import type { RequestPolicySnapshot } from "../../prompts/tools/effective-tool-policy"
 import type { Task } from "../../task/Task"
 import type { AskApproval } from "../../../shared/tools"
+import { TaskCommandAllowlist } from "../../task/TaskCommandAllowlist"
 
 // The presenter validates against this frozen request snapshot; the mocked
 // validateToolUse never reads policy fields, and the provider-state double in
@@ -54,7 +55,8 @@ const { executeCommandHandle, listFilesHandle, useMcpToolHandle } = vi.hoisted((
 	useMcpToolHandle: vi.fn(),
 }))
 
-vi.mock("../../tools/ExecuteCommandTool", () => ({
+vi.mock("../../tools/ExecuteCommandTool", async (importOriginal) => ({
+	...(await importOriginal<typeof import("../../tools/ExecuteCommandTool")>()),
 	executeCommandTool: { handle: executeCommandHandle },
 }))
 
@@ -85,6 +87,8 @@ interface MockTask {
 	apiConfiguration: { apiProvider: string }
 	recordToolUsage: ReturnType<typeof vi.fn>
 	recordToolError: ReturnType<typeof vi.fn>
+	cwd: string
+	commandAllowlist: TaskCommandAllowlist
 	toolRepetitionDetector: { check: ReturnType<typeof vi.fn> }
 	providerRef: {
 		deref: () => {
@@ -120,6 +124,8 @@ function buildMockTask(): MockTask {
 		apiConfiguration: { apiProvider: "test" },
 		recordToolUsage: vi.fn(),
 		recordToolError: vi.fn(),
+		cwd: "/test/workspace",
+		commandAllowlist: new TaskCommandAllowlist(),
 		toolRepetitionDetector: {
 			check: vi.fn().mockReturnValue({ allowExecution: true }),
 		},

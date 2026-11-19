@@ -182,6 +182,8 @@ const ChatViewComponent: React.ForwardRefRenderFunction<ChatViewRef, ChatViewPro
 	const [enableButtons, setEnableButtons] = useState<boolean>(false)
 	const [primaryButtonText, setPrimaryButtonText] = useState<string | undefined>(undefined)
 	const [secondaryButtonText, setSecondaryButtonText] = useState<string | undefined>(undefined)
+	// "Run + allow for task" on command asks; "default" when the model asked to run the command repeatedly.
+	const [allowForTaskOffer, setAllowForTaskOffer] = useState<"none" | "offered" | "default">("none")
 	const [_didClickCancel, setDidClickCancel] = useState(false)
 	const virtuosoRef = useRef<VirtuosoHandle>(null)
 	const [expandedRows, setExpandedRows] = useState<Record<number, boolean>>({})
@@ -392,6 +394,14 @@ const ChatViewComponent: React.ForwardRefRenderFunction<ChatViewRef, ChatViewPro
 							setEnableButtons(!isPartial)
 							setPrimaryButtonText(t("chat:runCommand.title"))
 							setSecondaryButtonText(t("chat:reject.title"))
+							// Protected (guard-blocked) commands always need a fresh approval.
+							setAllowForTaskOffer(
+								lastMessage.isProtected
+									? "none"
+									: lastMessage.requestsTaskAllow
+										? "default"
+										: "offered",
+							)
 							break
 						case "command_output":
 							setSendingDisabled(false)
@@ -783,6 +793,7 @@ const ChatViewComponent: React.ForwardRefRenderFunction<ChatViewRef, ChatViewPro
 		setEnableButtons(false)
 		setPrimaryButtonText(undefined)
 		setSecondaryButtonText(undefined)
+		setAllowForTaskOffer("none")
 	}, [])
 
 	// This logic depends on the useEffect[messages] above to set clineAsk,
@@ -859,6 +870,32 @@ const ChatViewComponent: React.ForwardRefRenderFunction<ChatViewRef, ChatViewPro
 		},
 		[clineAsk, startNewTask, currentTaskItem?.parentTaskId, clearApprovalButtons],
 	)
+
+	const handleAllowForTaskClick = useCallback(
+		(text?: string, images?: string[]) => {
+			if (clineAsk !== "command") {
+				return
+			}
+			userRespondedRef.current = true
+			const trimmedInput = text?.trim()
+			const hasFeedback = !!trimmedInput || (images !== undefined && images.length > 0)
+			vscode.postMessage({
+				type: "askResponse",
+				askResponse: "yesButtonClicked",
+				allowCommandForTask: true,
+				...(hasFeedback && { text: trimmedInput, images }),
+			})
+			if (hasFeedback) {
+				setInputValue("")
+				setSelectedImages([])
+			}
+			clearApprovalButtons()
+		},
+		[clineAsk, clearApprovalButtons],
+	)
+
+	const showAllowForTaskButton = clineAsk === "command" && allowForTaskOffer !== "none"
+	const allowForTaskIsDefault = showAllowForTaskButton && allowForTaskOffer === "default"
 
 	const handleSecondaryButtonClick = useCallback(
 		(text?: string, images?: string[]) => {
@@ -1640,7 +1677,9 @@ const ChatViewComponent: React.ForwardRefRenderFunction<ChatViewRef, ChatViewPro
 				return
 			}
 
-			if (enableButtons && primaryButtonText) {
+			if (enableButtons && allowForTaskIsDefault) {
+				handleAllowForTaskClick(inputValue, selectedImages)
+			} else if (enableButtons && primaryButtonText) {
 				handlePrimaryButtonClick(inputValue, selectedImages)
 			} else if (!sendingDisabled && !isProfileDisabled && hasInput) {
 				handleSendMessage(inputValue, selectedImages)
@@ -1812,7 +1851,7 @@ const ChatViewComponent: React.ForwardRefRenderFunction<ChatViewRef, ChatViewPro
 																				: primaryButtonText
 											}>
 											<Button
-												variant="primary"
+												variant={allowForTaskIsDefault ? "secondary" : "primary"}
 												disabled={!enableButtons}
 												className={
 													secondaryButtonText
@@ -1821,6 +1860,20 @@ const ChatViewComponent: React.ForwardRefRenderFunction<ChatViewRef, ChatViewPro
 												}
 												onClick={() => handlePrimaryButtonClick(inputValue, selectedImages)}>
 												<span className="min-w-0 truncate">{primaryButtonText}</span>
+											</Button>
+										</StandardTooltip>
+									)}
+									{primaryButtonText && showAllowForTaskButton && (
+										<StandardTooltip content={t("chat:runCommandAllowForTask.tooltip")}>
+											<Button
+												variant={allowForTaskIsDefault ? "primary" : "secondary"}
+												disabled={!enableButtons}
+												className="min-w-0 flex-1"
+												data-testid="run-allow-for-task-button"
+												onClick={() => handleAllowForTaskClick(inputValue, selectedImages)}>
+												<span className="min-w-0 truncate">
+													{t("chat:runCommandAllowForTask.title")}
+												</span>
 											</Button>
 										</StandardTooltip>
 									)}
